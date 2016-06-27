@@ -1,0 +1,167 @@
+﻿<head>
+  <style>
+    ul {
+      list-style-type: none;
+      transition: all 1s ease;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+    }
+
+      a:hover {
+        color: inherit;
+      }
+
+      a[data-subobjects]::after {
+        content: attr(data-subobjects) " objects";
+        font-size: 0.5em;
+        color: dimgrey;
+      }
+
+    .folder {
+      transition: all 0.5s ease;
+    }
+
+      .folder::before {
+        content: "\e117";
+        font-family: 'Glyphicons Halflings';
+        cursor: pointer;
+        margin: 5px;
+      }
+
+      .folder.open::before {
+        content: "\e118";
+        font-family: 'Glyphicons Halflings';
+        cursor: pointer;
+        margin: 5px;
+      }
+
+    .file {
+    }
+
+      .file::before {
+        content: "\e022";
+        font-family: 'Glyphicons Halflings';
+        cursor: pointer;
+        margin: 5px;
+      }
+
+    .valid {
+      color: green;
+    }
+
+    .invalid {
+      color: red;
+    }
+
+    .valid.invalid {
+      color: orange;
+    }
+
+    .copy {
+      position: relative;
+      display: block;
+      text-align: right;
+      color: lightgrey;
+      text-shadow: 1px 1px 1px whitesmoke;
+    }
+  </style>
+  <script>
+    function Folder_Clicked() {
+      var fils = this.parentElement.querySelector("ul");
+      if (fils != undefined) {
+        this.classList.toggle("open");
+        fils.style.display = (fils.style.display == "none") ? "block" : "none";
+      }
+    }
+    function Path_Clicked() {
+      txtModPath.value = (this.dataset.uncpath != undefined) ? this.dataset.uncpath : "Couldn't find UNC Path";
+      txtModMessage.value = (this.dataset.message != undefined) ? this.dataset.message : "No message.";
+      $("#modPathDetails").modal("show");
+    }
+    function CopyPath(val) {
+      var msg = "";
+      try {
+        $("#modCopy").modal("show");
+        txtCopy.value = val;
+        txtCopy.select();
+        var successful = document.execCommand('copy');
+        msg = successful ? 'successful' : 'unsuccessful';
+        console.log('Copying text command was ' + msg + ' with value:', val);
+        setTimeout(function () { $("#modCopy").modal("hide") }, 1500);
+      } catch (err) {
+        console.log('Oops, unable to copy ' + msg);
+      }
+    }
+    window.onload = function () {
+      var folds = document.querySelectorAll(".folder");
+      // Add onclick event
+      for (var len = folds.length, n = 0; n < len; n++) {
+        folds[n].onclick = Folder_Clicked;
+
+        if (folds[n].parentElement.classList.contains("valid")) {
+          if (folds[n].parentElement.querySelectorAll(".invalid").length > 0) {
+            folds[n].parentElement.classList.add("invalid");
+          }
+        }
+      }
+      folds = document.querySelectorAll("li > a");
+      // Add onclick event
+      for (var len = folds.length, n = 0; n < len; n++) {
+        folds[n].onclick = Path_Clicked;
+
+        // Add counter content for each span
+        var fils = folds[n].parentElement.querySelectorAll("li");
+        if (fils.length > 0) {
+          folds[n].dataset.subobjects = fils.length;
+        }
+      }
+
+      // Default close all folders
+      document.querySelector(".container ul").style.display = "block";
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="jumbotron">
+      <h2>Path Structure Audit: File System Report</h2>
+      <p class="alert alert-info">This report serves as a visual representation of the audit performed on the selected file system. You can expand folders and click on paths to review details of auditing the specified item.</p>
+    </div>
+    {PLACEHOLDER:FILESYSTEM}
+    <div class="modal fade" role="dialog" id="modPathDetails">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4>Path Details</h4>
+          </div>
+          <div class="modal-body">
+            <label for="txtModPath" class="label label-primary">Path</label><input id="txtModPath" type="text" class="form-control" readonly />
+            <a class="copy" onclick="CopyPath(this.previousElementSibling.value);">copy</a>
+            <label for="txtModMessage" class="label label-primary">Message</label><textarea id="txtModMessage" class="form-control" readonly></textarea>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary btn-block" data-dismiss="modal">Okay</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal" role="dialog" id="modCopy">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h4>Copying...</h4>
+            <a class="close" data-dismiss="modal">&times;</a>
+          </div>
+          <div class="modal-body">
+            <textarea rows="3" id="txtCopy" class="form-control"></textarea>
+            <p class="alert alert-info">Copied the above text to your clipboard.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
