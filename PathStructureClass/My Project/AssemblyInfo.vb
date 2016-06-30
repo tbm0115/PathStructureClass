@@ -10,9 +10,9 @@ Imports System.Runtime.InteropServices
 
 <Assembly: AssemblyTitle("PathStructureClass")> 
 <Assembly: AssemblyDescription("")> 
-<Assembly: AssemblyCompany("Windows User")> 
+<Assembly: AssemblyCompany("LightWorks")> 
 <Assembly: AssemblyProduct("PathStructureClass")> 
-<Assembly: AssemblyCopyright("Copyright © Windows User 2016")> 
+<Assembly: AssemblyCopyright("Copyright © Trais McAllister 2016")> 
 <Assembly: AssemblyTrademark("")> 
 
 <Assembly: ComVisible(False)>
@@ -31,5 +31,5 @@ Imports System.Runtime.InteropServices
 ' by using the '*' as shown below:
 ' <Assembly: AssemblyVersion("1.0.*")> 
 
-<Assembly: AssemblyVersion("1.0.0.0")> 
-<Assembly: AssemblyFileVersion("1.0.0.0")> 
+<Assembly: AssemblyVersion("1.0.1.20")> 
+<Assembly: AssemblyFileVersion("1.0.1.20")> 
