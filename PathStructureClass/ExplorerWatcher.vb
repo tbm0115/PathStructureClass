@@ -11,6 +11,14 @@ Public Class ExplorerWatcher
   Private _pollRate As Integer
   Private _watcher As System.Threading.Thread
   Private _cancel As Boolean
+  Private _evt As ExplorerWatcherFoundEventArgs
+
+  Public ReadOnly Property CurrentFoundPaths As ExplorerWatcherFoundEventArgs
+    Get
+      Return _evt
+    End Get
+  End Property
+
   ''' <summary>
   ''' This event is raised whenever a path selected in Windows Explorer or navigated to in Internet Explorer 
   ''' is successfully validated in Path.IsNamedStructure() as it would in an audit.
@@ -102,7 +110,7 @@ Public Class ExplorerWatcher
     End If
   End Sub
 
-  Private Function GetExplorerPath(Optional ByRef lst As SortedList(Of String, Boolean) = Nothing) As ExplorerWatcherFoundEventArgs ' SortedList(Of PathStructureClass.Path, Boolean)
+  Private Function GetExplorerPath(Optional ByRef lst As SortedList(Of String, Boolean) = Nothing) As ExplorerWatcherFoundEventArgs
     Dim exShell As New Shell
     If lst Is Nothing Then
       lst = New SortedList(Of String, Boolean)
@@ -112,16 +120,25 @@ Public Class ExplorerWatcher
     Dim strTemp As String
 
     If _pathStruct IsNot Nothing Then
+      '' Get all the open Explorer windows
       For Each w As ShellBrowserWindow In DirectCast(exShell.Windows, IShellWindows)
         strTemp = ""
         Try
+          '' Somehow these are different. They're known to fail so try everything.
           If TryCast(w.Document, IShellFolderViewDual) IsNot Nothing Then
-            strTemp = GetUNCPath(DirectCast(w.Document, IShellFolderViewDual).FocusedItem.Path)
+            Dim sh As IShellFolderViewDual = DirectCast(w.Document, IShellFolderViewDual)
+            If sh.FocusedItem IsNot Nothing Then
+              strTemp = GetUNCPath(sh.FocusedItem.Path)
+            End If
           ElseIf TryCast(w.Document, ShellFolderView) IsNot Nothing Then
-            strTemp = GetUNCPath(DirectCast(w.Document, ShellFolderView).FocusedItem.Path)
+            Dim sh As ShellFolderView = DirectCast(w.Document, ShellFolderView)
+            If sh.FocusedItem IsNot Nothing Then
+              strTemp = GetUNCPath(sh.FocusedItem.Path)
+            End If
           End If
         Catch ex As Exception
           _cancel = True
+          '' Go ahead and quit. Chances are that someone closed/opened windows too quickly
           RaiseEvent ExplorerWatcherAborted(Me, New System.UnhandledExceptionEventArgs(ex, True))
           Return Nothing
         End Try
@@ -143,9 +160,9 @@ Public Class ExplorerWatcher
   Private Sub ExplorerQuery()
     Static old As SortedList(Of String, Boolean)
     Dim tmp As New SortedList(Of String, Boolean)
-    Dim evt As ExplorerWatcherFoundEventArgs = GetExplorerPath(tmp)
+    _evt = GetExplorerPath(tmp)
     '' Check that the GetExplorerPath did not error out
-    If evt IsNot Nothing Then
+    If _evt IsNot Nothing Then
       Dim blnChanged As Boolean = False
       '' Check for initialized state
       If old Is Nothing Then
@@ -168,7 +185,7 @@ Public Class ExplorerWatcher
       End If
       If blnChanged Then
         old = tmp
-        RaiseEvent ExplorerWatcherFound(Me, evt)
+        RaiseEvent ExplorerWatcherFound(Me, _evt)
       End If
     End If
     '' Check for request to cancel

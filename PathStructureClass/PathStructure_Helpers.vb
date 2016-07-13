@@ -1,4 +1,4 @@
-﻿Imports System.IO, System.Text
+﻿Imports System.IO, System.Security.AccessControl, System.Text
 Imports System.Xml
 Imports System.Runtime.CompilerServices
 
@@ -184,22 +184,28 @@ Public Module PathStructure_Helpers
   Declare Function WNetGetConnection Lib "mpr.dll" Alias "WNetGetConnectionA" (ByVal lpszLocalName As String, _
      ByVal lpszRemoteName As String, ByRef cbRemoteName As Integer) As Integer
 
+  ''' <summary>
+  ''' Gets the UNC representation of the provided path
+  ''' </summary>
+  ''' <param name="sFilePath"></param>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
   Public Function GetUNCPath(ByVal sFilePath As String) As String
-    Dim allDrives() As DriveInfo = DriveInfo.GetDrives()
-    Dim d As DriveInfo
+    '' Check before allocating resources...
+    If sFilePath.StartsWith("\\") Then Return sFilePath
+    '' Now allocate resources for processing
+    Static allDrives() As DriveInfo = DriveInfo.GetDrives()
+    'Dim d As DriveInfo
     Dim DriveType, Ctr As Integer
     Dim DriveLtr, UNCName As String
     Dim StrBldr As New StringBuilder
 
-    If sFilePath.StartsWith("\\") Then Return sFilePath
-
     UNCName = Space(160)
-    Log("GetUNC: " & sFilePath)
     DriveLtr = sFilePath.Substring(0, 3)
 
-    For Each d In allDrives
-      If d.Name = DriveLtr Then
-        DriveType = d.DriveType
+    For i = 0 To allDrives.Length - 1 Step 1 ' Each d In allDrives
+      If allDrives(i).Name = DriveLtr Then
+        DriveType = allDrives(i).DriveType
         Exit For
       End If
     Next
@@ -237,4 +243,44 @@ Public Module PathStructure_Helpers
     'IO.File.AppendAllText(My.Computer.FileSystem.SpecialDirectories.MyDocuments.ToString & "\Path Structure Log.txt", input & vbLf)
   End Sub
 
+  Public Sub AddDirectorySecurity(ByVal Path As String, ByVal Account As String, ByVal Rights As FileSystemRights, ByVal ControlType As AccessControlType)
+    Dim Dir As New DirectoryInfo(Path)
+    AddDirectorySecurity(Dir, Account, Rights, ControlType)
+  End Sub
+  Public Sub AddDirectorySecurity(ByVal Dir As DirectoryInfo, ByVal Account As String, ByVal Rights As FileSystemRights, ByVal ControlType As AccessControlType)
+    Dim sec As DirectorySecurity = Dir.GetAccessControl()
+
+    sec.AddAccessRule(New FileSystemAccessRule(Account, Rights, ControlType))
+
+    Dir.SetAccessControl(sec)
+  End Sub
+  Public Sub RemoveDirectorySecurity(ByVal Path As String, ByVal Account As String, ByVal Rights As FileSystemRights, ByVal ControlType As AccessControlType)
+    Dim Dir As New DirectoryInfo(Path)
+    RemoveDirectorySecurity(Dir, Account, Rights, ControlType)
+  End Sub
+  Public Sub RemoveDirectorySecurity(ByVal Dir As DirectoryInfo, ByVal Account As String, ByVal Rights As FileSystemRights, ByVal ControlType As AccessControlType)
+    Dim sec As DirectorySecurity = Dir.GetAccessControl()
+
+    sec.RemoveAccessRule(New FileSystemAccessRule(Account, Rights, ControlType))
+
+    Dir.SetAccessControl(sec)
+  End Sub
+
+  ''' <summary>
+  ''' Gets an array of raw variable names from the provided string
+  ''' </summary>
+  ''' <param name="Input"></param>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public Function GetListOfRawVariables(ByVal Input As String) As String()
+    Dim lst As New List(Of String)
+    Do Until (Not Input.Contains("{")) And (Not Input.Contains("}"))
+      If Input.IndexOf("{") < Input.IndexOf("}") Then
+        Input = Input.Remove(0, Input.IndexOf("{") + 1)
+        lst.Add(Input.Remove(Input.IndexOf("}")))
+        Input = Input.Remove(0, Input.IndexOf("}") + 1)
+      End If
+    Loop
+    Return lst.ToArray
+  End Function
 End Module

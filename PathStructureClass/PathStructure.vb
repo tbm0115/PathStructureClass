@@ -1,4 +1,4 @@
-﻿Imports System.Xml, System.IO, System.Text
+﻿Imports System.Xml, System.IO, System.Security.AccessControl, System.Text
 Imports HTML, HTML.HTMLWriter, HTML.HTMLWriter.HTMLTable
 Imports System.Data, System.Data.OleDb, System.Data.Sql, System.Data.SqlClient
 Public Class PathStructure
@@ -6,6 +6,8 @@ Public Class PathStructure
   Private _myXML As XmlDocument
   Private _DeleteThumbs As Boolean = False
   Private _HandleExtensions As Boolean = False
+  Private _generateIcons As Boolean = False
+  Private _setPermissions As Boolean = False
   Private _ERPConnection As String
   Public defaultPaths As New List(Of String)
   Public ERPConnection As DatabaseConnection ' New DatabaseConnection(My.Settings.ERPConnection)
@@ -62,16 +64,68 @@ Public Class PathStructure
       _HandleExtensions = value
     End Set
   End Property
+  Public Property CanGenerateIcons As Boolean
+    Get
+      Return _generateIcons
+    End Get
+    Set(value As Boolean)
+      _generateIcons = value
+    End Set
+  End Property
+  Public Property CanSetPermissions As Boolean
+    Get
+      Return _setPermissions
+    End Get
+    Set(value As Boolean)
+      _setPermissions = value
+    End Set
+  End Property
+
 
   Public Sub New(ByVal SettingsDocument As String,
-                 Optional ByVal ERPConnectionString As String = "", Optional ByVal ERPCheck As Boolean = False,
+                 Optional ByVal ERPConnectionString As String = "",
+                 Optional ByVal ERPCheck As Boolean = False,
                  Optional ByVal DeleteThumbsDb As Boolean = False,
-                 Optional ByVal ProcessExtensions As Boolean = False)
+                 Optional ByVal ProcessExtensions As Boolean = False,
+                 Optional ByVal GenerateIcons As Boolean = False,
+                 Optional ByVal SetPermissions As Boolean = False)
     _xmlPath = SettingsDocument
     _myXML = New XmlDocument
     _myXML.Load(_xmlPath)
     If _myXML Is Nothing Then
       Throw New ArgumentException("PathStructure: XML Settings cannot be nothing!")
+    Else
+      '' Fix the settings file
+      '' Remove any tmpURI's
+      Dim attrs As XmlNodeList = _myXML.SelectNodes("//*[@tmpURI]")
+      If attrs.Count > 0 Then
+        For i = attrs.Count - 1 To 0 Step -1
+          attrs(i).Attributes.Remove(attrs(i).Attributes.ItemOf("tmpURI"))
+        Next
+      End If
+      '' Fix any links
+      Dim lst As XmlNodeList = _myXML.SelectNodes("//Folder[@link]")
+      If lst.Count > 0 Then
+        For i = 0 To lst.Count - 1 Step 1
+          If lst(i).Attributes("link") IsNot Nothing Then
+            '' Re-add the childnodes (they could technically be different after all!
+            Dim fold As XmlElement = _myXML.SelectSingleNode(lst(i).Attributes("link").Value).CloneNode(True)
+
+            '' Remove childnodes
+            If lst(i).HasChildNodes Then
+              lst(i).InnerXml = ""
+            End If
+            If fold IsNot Nothing Then
+              lst(i).AppendChild(fold)
+            End If
+          End If
+        Next
+      End If
+      _myXML.Save(_xmlPath)
+
+      For Each struct As XmlElement In _myXML.SelectNodes("//Structure")
+        defaultPaths.Add(struct.Attributes("defaultPath").Value)
+      Next
     End If
 
     _ERPConnection = ERPConnectionString
@@ -80,10 +134,8 @@ Public Class PathStructure
 
     _DeleteThumbs = DeleteThumbsDb
     _HandleExtensions = ProcessExtensions
-
-    For Each struct As XmlElement In _myXML.SelectNodes("//Structure")
-      defaultPaths.Add(struct.Attributes("defaultPath").Value)
-    Next
+    _generateIcons = GenerateIcons
+    _setPermissions = SetPermissions
   End Sub
 
   Public Function IsInDefaultPath(ByVal Input As String, Optional ByVal PreferredPath As String = "") As Boolean
@@ -107,7 +159,7 @@ Public Class PathStructure
   ''' <returns>String</returns>
   ''' <remarks></remarks>
   Public Function ReplaceVariables(ByVal Input As String, ByVal Path As String) As String
-    Dim vars As New Path.VariableArray("//Variables", Path)
+    Dim vars As New VariableArray("//Variables", New Path(Me, Path))
     Return vars.Replace(Input)
   End Function
 
@@ -143,10 +195,49 @@ Public Class PathStructure
         a.Value = u.ToString
         Return u.ToString
       End If
-    Else
-      Return ""
     End If
+    Return ""
   End Function
+  ''' <summary>
+  ''' Converts the XPath for the PathStructure into a valid FileSystem path.
+  ''' </summary>
+  ''' <param name="XElement">XML Element</param>
+  ''' <returns>String</returns>
+  ''' <remarks></remarks>
+  Public Function GetURIfromXPath(ByVal XElement As XmlElement) As String
+    If XElement IsNot Nothing Then
+      '' Check if the element has the temporary URI for this session. If so, use it
+      If XElement.HasAttribute("tmpURI") Then
+        Return XElement.Attributes("tmpURI").Value
+      Else
+        Dim a As XmlAttribute = _myXML.CreateAttribute("tmpURI")
+        XElement.Attributes.Append(a)
+        Dim u As New StringBuilder
+        Do Until XElement.Name = "Structure"
+          If String.Equals(XElement.Name, "Folder", StringComparison.OrdinalIgnoreCase) Then
+            u.Insert(0, XElement.Attributes("name").Value & "\")
+          ElseIf String.Equals(XElement.Name, "File", StringComparison.OrdinalIgnoreCase) Then
+            u.Append(XElement.InnerText)
+          ElseIf String.Equals(XElement.Name, "Option", StringComparison.OrdinalIgnoreCase) Then
+            u.Append(XElement.InnerText)
+            XElement = XElement.ParentNode '' Set parent node to 'File' so that the next x-set will set x to the folder
+          End If
+          XElement = XElement.ParentNode
+        Loop
+        'u = _startPath & u
+        u.Insert(0, XElement.Attributes("defaultPath").Value & "\") ' & x.Attributes("path").Value & "\")
+        a.Value = u.ToString
+        Return u.ToString
+      End If
+    End If
+    Return ""
+  End Function
+  ''' <summary>
+  ''' Gets the value of the Description attribute from the given XPath element
+  ''' </summary>
+  ''' <param name="XPath"></param>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
   Public Function GetDescriptionfromXPath(ByVal XPath As String) As String
     If Not String.IsNullOrEmpty(XPath) Then
       Dim x As XmlElement = _myXML.SelectSingleNode(XPath)
@@ -154,6 +245,20 @@ Public Class PathStructure
         If x.HasAttribute("description") Then
           Return x.Attributes("description").Value
         End If
+      End If
+    End If
+    Return ""
+  End Function
+  ''' <summary>
+  ''' Gets the value of the Description attribute from the given XmlElement
+  ''' </summary>
+  ''' <param name="XElement"></param>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public Function GetDescriptionfromXPath(ByVal XElement As XmlElement) As String
+    If XElement IsNot Nothing Then
+      If XElement.HasAttribute("description") Then
+        Return XElement.Attributes("description").Value
       End If
     End If
     Return ""
@@ -295,7 +400,11 @@ Public Class Extensions
         End If
       End If
     End If
-    _pathStruct.Settings.Save(_pathStruct.SettingsPath)
+    Try
+      _pathStruct.Settings.Save(_pathStruct.SettingsPath)
+    Catch ex As Exception
+      Log("Couldn't save the settings file due to process error: " & ex.Message)
+    End Try
   End Sub
 
   ''' <summary>
@@ -449,6 +558,7 @@ Public Class Extensions
 End Class
 
 Public Class Path : Implements IDisposable
+
   Private _type As PathType
   Private _path As String
   Private Shared _struct As XmlElement
@@ -462,6 +572,7 @@ Public Class Path : Implements IDisposable
   Private _candidates As StructureCandidateArray
   Private Shared _pstruct As PathStructure
   Private _exts As Extensions
+  Private _users As Users
 
   Public ReadOnly Property GetPathStructure As PathStructure
     Get
@@ -517,21 +628,29 @@ Public Class Path : Implements IDisposable
         If IsNothing(_children) Then
           Dim arr As New List(Of Path)
           Dim chk As Boolean
-          For Each fil As String In IO.Directory.EnumerateFiles(_path)
-            chk = True
-            Dim tmp As New Path(_pstruct, fil, PathType.File, chk)
-            If chk Then
-              arr.Add(tmp)
-            End If
-          Next
-          For Each fol As String In IO.Directory.EnumerateDirectories(_path)
-            chk = True
-            Dim tmp As New Path(_pstruct, fol, PathType.Folder, chk)
-            If chk Then
-              arr.Add(tmp)
-            End If
-          Next
-          _children = arr.ToArray
+          Try
+            For Each fil As String In IO.Directory.EnumerateFiles(_path)
+              chk = True
+              Dim tmp As New Path(_pstruct, fil, PathType.File, chk)
+              If chk Then
+                arr.Add(tmp)
+                'Else
+                'Log("Addition of File '" & tmp.UNCPath & "' failed during initialization")
+              End If
+            Next
+            For Each fol As String In IO.Directory.EnumerateDirectories(_path)
+              chk = True
+              Dim tmp As New Path(_pstruct, fol, PathType.Folder, chk)
+              If chk Then
+                arr.Add(tmp)
+                'Else
+                'Log("Addition of Folder '" & tmp.UNCPath & "' failed during initialization")
+              End If
+            Next
+            _children = arr.ToArray
+          Catch ex As Exception
+            Log("PathStructure: FSO child enumeration error. " & ex.Message)
+          End Try
         End If
         Return _children
       Else
@@ -555,10 +674,13 @@ Public Class Path : Implements IDisposable
   ''' <value>Key is variable name. Value is the variable value.</value>
   ''' <returns>SortedList(Of String, String)</returns>
   ''' <remarks></remarks>
-  Public ReadOnly Property Variables As VariableArray
+  Public Property Variables As VariableArray
     Get
       Return _variables
     End Get
+    Set(value As VariableArray)
+      _variables = value
+    End Set
   End Property
   ''' <summary>
   ''' Gets the UNC formatted path of the current path
@@ -635,6 +757,15 @@ Public Class Path : Implements IDisposable
       Return _candidates
     End Get
   End Property
+  Public Property Users As Users
+    Get
+      Return _users
+    End Get
+    Set(value As Users)
+      _users = value
+    End Set
+  End Property
+
 
   Public Enum PathType
     File
@@ -648,7 +779,10 @@ Public Class Path : Implements IDisposable
     Return String.Equals(obj.ToString, _path, StringComparison.OrdinalIgnoreCase)
   End Function
 
-  Public Sub New(ByVal PStructure As PathStructure, ByVal Path As String, Optional ByVal SetType As Path.PathType = Nothing, Optional ByRef Successful As Boolean = Nothing)
+  Public Sub New(ByVal PStructure As PathStructure,
+                 ByVal Path As String,
+                 Optional ByVal SetType As Path.PathType = Nothing,
+                 Optional ByRef Successful As Boolean = Nothing)
     _pstruct = PStructure
     '' Set path
     If String.IsNullOrEmpty(Path) Then
@@ -700,271 +834,17 @@ Public Class Path : Implements IDisposable
     If _struct Is Nothing Then Throw New ArgumentException("PathStructure: Couldn't determine the default Structure node from '" & _path & "'. Searched " & structs.Count.ToString & " Structures in XmlDocument.")
 
     _defaultPath = _struct.Attributes("path").Value
+    If _struct.SelectSingleNode("Users") IsNot Nothing Then
+      _users = New Users(_struct.SelectSingleNode("Users"))
+    End If
+
     Dim defSeparator As Integer = CountStringOccurance(_defaultPath, IO.Path.DirectorySeparatorChar)
     '' Enumerate variables
-    _variables = New VariableArray(_struct.SelectSingleNode("Variables"), _path)
-
+    _variables = New VariableArray(_struct.SelectSingleNode("Variables"), Me)
 
     '' Set Start path
     _startPath = _defaultPath & "\" & Variables.Replace(_struct.Attributes("path").Value)
   End Sub
-
-  Public Class VariableArray
-    Private _x As XmlElement
-    Private _path As String
-    Private _lst As New List(Of Variable)
-
-    Default Public Property Item(ByVal Index As Integer) As Variable
-      Get
-        Return _lst(Index)
-      End Get
-      Set(value As Variable)
-        _lst(Index) = value
-      End Set
-    End Property
-    Default Public Property Item(ByVal Name As String) As Variable
-      Get
-        Dim v As Variable = Nothing
-        For i = 0 To _lst.Count - 1 Step 1
-          If String.Equals(_lst(i).Name, Name, StringComparison.OrdinalIgnoreCase) Then
-            v = _lst(i)
-            Exit For
-          End If
-        Next
-        Return v
-      End Get
-      Set(value As Variable)
-        Dim v As Variable = Nothing
-        For i = 0 To _lst.Count - 1 Step 1
-          If String.Equals(_lst(i).Name, Name, StringComparison.OrdinalIgnoreCase) Then
-            _lst(i) = value
-            Exit For
-          End If
-        Next
-      End Set
-    End Property
-    Public ReadOnly Property Count As Integer
-      Get
-        Return _lst.Count
-      End Get
-    End Property
-    Public ReadOnly Property Items As Variable()
-      Get
-        Return _lst.ToArray
-      End Get
-    End Property
-
-    Public Sub New(ByVal XPath As String, ByVal Path As String)
-      _x = _struct.SelectSingleNode(XPath)
-      _path = Path
-      If _x IsNot Nothing Then
-        If _x.HasChildNodes Then
-          AddRange(_x.SelectNodes("Variable"))
-        End If
-      End If
-    End Sub
-    Public Sub New(ByVal XElement As XmlElement, ByVal Path As String)
-      _x = XElement
-      _path = Path
-      If _x IsNot Nothing Then
-        If _x.HasChildNodes Then
-          AddRange(_x.SelectNodes("Variable"))
-        End If
-      End If
-    End Sub
-
-    Private Sub Add(ByVal XPath As String)
-      _lst.Add(New Variable(XPath, _path))
-    End Sub
-    Private Sub Add(ByVal XElement As XmlElement)
-      _lst.Add(New Variable(XElement, _path))
-    End Sub
-    Private Sub AddRange(ByVal XPaths As String())
-      For i = 0 To XPaths.Length - 1 Step 1
-        _lst.Add(New Variable(XPaths(i), _path))
-      Next
-    End Sub
-    Private Sub AddRange(ByVal XElements As XmlNodeList)
-      For i = 0 To XElements.Count - 1 Step 1
-        _lst.Add(New Variable(XElements(i), _path))
-      Next
-    End Sub
-
-    Public Function Replace(ByVal Input As String) As String
-      If _lst.Count > 0 Then
-        For i = 0 To _lst.Count - 1 Step 1
-          Input = _lst(i).Replace(Input)
-        Next
-      End If
-      Return Input
-    End Function
-
-    Public Function IsValid(ByVal Input As String) As Boolean
-      Dim blnValid As Boolean = True
-      Dim tmp As Boolean
-      For i = 0 To _lst.Count - 1 Step 1
-        tmp = _lst(i).HasVariable(Input)
-        'Debug.WriteLine("Input has variable? " & tmp.ToString & " (" & _lst(i).Name & ")(" & Input & ")")
-        If tmp Then
-          If Not _lst(i).IsValid() Then
-            blnValid = False
-            Exit For
-          End If
-        End If
-      Next
-      Return blnValid
-    End Function
-
-    Public Function ContainsName(ByVal PathName As String) As Boolean
-      Dim fnd As Boolean = False
-      For i = 0 To _lst.Count - 1 Step 1
-        If PathName.IndexOf(_lst(i).Name, System.StringComparison.OrdinalIgnoreCase) >= 0 Then ' String.Equals(, PathName, StringComparison.OrdinalIgnoreCase) Then
-          fnd = True
-          Exit For
-        End If
-      Next
-      Return fnd
-    End Function
-    Public Function EndsWithName(ByVal PathName As String) As Boolean
-      Dim fnd As Boolean = False
-      For i = 0 To _lst.Count - 1 Step 1
-        '' Check that the index of the variable name is towards the end. There is a tolerance of 2 characters
-        If PathName.LastIndexOf(_lst(i).Name, System.StringComparison.OrdinalIgnoreCase) >= (PathName.Length - _lst(i).Name.Length - 2) Then ' String.Equals(_lst(i).Name, PathName, StringComparison.OrdinalIgnoreCase) Then
-          fnd = True
-          Exit For
-        End If
-      Next
-      Return fnd
-    End Function
-  End Class
-  Public Class Variable
-    Private _x As XmlElement
-    Private _name, _erptable As String
-    Private _index As Integer
-    Private _cmds As New List(Of ERPCommand)
-    Private _path As String
-    Public ReadOnly Property Value As String
-      Get
-        Dim nodes As String() = _path.Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
-        If _index < nodes.Length Then
-          Return nodes(_index)
-        Else
-          Return ""
-        End If
-      End Get
-    End Property
-    Public ReadOnly Property Name As String
-      Get
-        Return _name
-      End Get
-    End Property
-
-    Public Sub New(ByVal XPath As String, ByVal Path As String)
-      _x = _struct.SelectSingleNode(XPath)
-      _name = _x.Attributes("name").Value
-      If _x.HasAttribute("erp") Then
-        _erptable = _x.Attributes("erp").Value
-      End If
-      _index = Convert.ToInt32(_x.Attributes("pathindex").Value)
-      If _x.HasChildNodes Then
-        Dim cmds As XmlNodeList = _x.SelectNodes("ERPCommand")
-        For i = 0 To cmds.Count - 1 Step 1
-          _cmds.Add(New ERPCommand(cmds(i)))
-        Next
-      End If
-      _path = Path
-    End Sub
-    Public Sub New(ByVal XElement As XmlElement, ByVal Path As String)
-      _x = XElement
-      _name = _x.Attributes("name").Value
-      If _x.HasAttribute("erp") Then
-        _erptable = _x.Attributes("erp").Value
-      End If
-      _index = Convert.ToInt32(_x.Attributes("pathindex").Value)
-      If _x.HasChildNodes Then
-        Dim cmds As XmlNodeList = _x.SelectNodes("ERPCommand")
-        For i = 0 To cmds.Count - 1 Step 1
-          _cmds.Add(New ERPCommand(cmds(i)))
-        Next
-      End If
-      _path = Path
-    End Sub
-
-    Public Function HasVariable(ByVal Input As String) As Boolean
-      Return (Input.IndexOf(_name) >= 0)
-    End Function
-
-    Public Function IsValid() As Boolean
-      Dim blnFound As Boolean = False
-      If _pstruct.CheckERPSystem Then ' My.Settings.blnERPCheck Then
-        Dim cond As String
-        Dim selFields As String
-        For i = 0 To _cmds.Count - 1 Step 1
-          If _cmds(i).IsOR Then '' Check if the command has an OR operator
-            selFields += String.Join(",", _cmds(i).Fields) & ","
-            cond += "(" & _cmds(i).Fields.SurroundJoin("", "='" & Replace(_cmds(i).Value).Replace("'", "''") & "' OR ", True) & ")"
-            If cond.EndsWith(" OR )") Then cond = cond.Remove(cond.LastIndexOf(" OR )")) & ")"
-          Else
-            selFields += _cmds(i).Field & ","
-            cond += _cmds(i).Field & "='" & Replace(_cmds(i).Value).Replace("'", "''") & "' AND "
-          End If
-        Next
-        If selFields.LastIndexOf(",") = selFields.Length - 1 Then selFields = selFields.Remove(selFields.Length - 1)
-        If cond.EndsWith(" AND ") Then cond = cond.Remove(cond.LastIndexOf(" AND "))
-        cond = cond.Replace("{", "").Replace("}", "")
-
-        If _pstruct.ERPConnection.Successful Then ' ERPConnection.Successful Then
-          blnFound = _pstruct.ERPConnection.CommandHasValues("SELECT " & selFields & " FROM [" & _erptable & "] WHERE " & cond & ";") 'ERPConnection.CommandHasValues("SELECT " & selFields & " FROM [" & _erptable & "] WHERE " & cond & ";")
-        End If
-      Else
-        blnFound = True '' Set to true if the flag isn't even set. No need to raise alarm
-      End If
-      Return blnFound
-    End Function
-
-    Public Function Replace(ByVal Input As String) As String
-      If Not String.IsNullOrEmpty(Input) Then
-        If Input.IndexOf(_name, System.StringComparison.OrdinalIgnoreCase) >= 0 Then
-          Input = Input.Replace(_name, Value)
-        End If
-      End If
-      Return Input
-    End Function
-
-    Public Class ERPCommand
-      Private _x As XmlElement
-      Private _rawcmd As String
-      Public ReadOnly Property Field As String
-        Get
-          Return _rawcmd.Remove(_rawcmd.IndexOf("="))
-        End Get
-      End Property
-      Public ReadOnly Property Value As String
-        Get
-          Return _rawcmd.Remove(0, _rawcmd.IndexOf("=") + 1)
-        End Get
-      End Property
-      Public ReadOnly Property IsOR As Boolean
-        Get
-          Return (Field.IndexOf("||") >= 0)
-        End Get
-      End Property
-      Public ReadOnly Property Fields As String()
-        Get
-          Return Field.Split({"||"}, System.StringSplitOptions.RemoveEmptyEntries)
-        End Get
-      End Property
-
-      Public Sub New(ByVal XPath As String)
-        _x = _struct.SelectSingleNode(XPath)
-        _rawcmd = _x.InnerText
-      End Sub
-      Public Sub New(ByVal XElement As XmlElement)
-        _x = XElement
-        _rawcmd = _x.InnerText
-      End Sub
-    End Class
-  End Class
 
   ''' <summary>
   ''' Determines if the current instance of a Path is a descendant of the DefaultPath (or root directory)
@@ -987,25 +867,28 @@ Public Class Path : Implements IDisposable
   ''' <remarks></remarks>
   Public Function IsNameStructured() As Boolean
     '' Initialize candidates
-    _candidates = New StructureCandidateArray(_path)
+    'Log(vbTab & vbTab & "Initializing StructureCandidateArray for IsNameStructured routine of '" & Me.UNCPath & "'")
+    _candidates = New StructureCandidateArray(Me)
 
     Dim strTemp As String
     Dim searchXPath As String
     Dim blnFound As Boolean = False
     Dim isMatch As Boolean
     If _type = PathType.File Then
-      strTemp = Me.Variables.Replace(ParentPath) ' ReplaceVariables(ParentPath, _path)
+      strTemp = Variables.Replace(ParentPath) ' ReplaceVariables(ParentPath, _path)
       searchXPath = ".//Folder[@name='" & Uri.EscapeDataString(strTemp) & "']/File[not(Option)]|.//Folder[@name='" & Uri.EscapeDataString(strTemp) & "']/File/Option"
       If _struct.SelectNodes(searchXPath).Count <= 0 Then searchXPath = "//File[not(Option)]|.//File/Option"
     ElseIf _type = PathType.Folder Then
-      strTemp = Me.Variables.Replace(PathName) ' ReplaceVariables(PathName, _path)
+      strTemp = Variables.Replace(PathName) ' ReplaceVariables(PathName, _path)
       searchXPath = ".//Folder[@name='" & Uri.EscapeDataString(strTemp) & "']"
       If _struct.SelectNodes(searchXPath).Count <= 0 Then searchXPath = ".//Folder"
     End If
     If Not String.IsNullOrEmpty(searchXPath) Then
       Dim objs As XmlNodeList = _struct.SelectNodes(searchXPath)
+      'Log(New String(vbTab, 3) & objs.Count.ToString & " potential nodes found using '" & searchXPath & "'")
       If objs.Count > 0 Then
         _candidates.AddRange(objs) '' Add all of the matching XPaths. Each new object will run a match check.
+        _candidates.GetHighestMatch().CheckForLinkVariables() '' Try to fix variables with this
         _candidates.RemoveMismatches(100) '' Remove any mismatches
       Else
         'Debug.WriteLine("No nodes found for '" & searchXPath & "'")
@@ -1024,6 +907,35 @@ Public Class Path : Implements IDisposable
       'Debug.WriteLine("Fail(" & _candidates.Count.ToString & "): " & _path & " = " & SurroundJoin(_candidates.ToArray, "[", "]"))
       blnFound = False
     ElseIf _candidates.Count = 1 Then
+      If _type = PathType.Folder Then
+        If _pstruct.CanGenerateIcons Then
+          '' If allowed, check if this path has a preferred icon and create the desktop.ini file
+          If _candidates(0).XElement.HasAttribute("icon") Then
+            Dim desktopINI As String = IO.Path.Combine({_path, "desktop.ini"})
+            If Not IO.File.Exists(desktopINI) Then
+              Dim iconIndex, iconTip As String
+              If _candidates(0).XElement.HasAttribute("iconindex") Then
+                iconIndex = _candidates(0).XElement.Attributes("iconindex").Value
+              Else
+                iconIndex = "0"
+              End If
+              If _candidates(0).XElement.HasAttribute("icontip") Then
+                iconTip = _candidates(0).XElement.Attributes("icontip").Value
+              ElseIf _candidates(0).XElement.HasAttribute("description") Then
+                iconTip = _candidates(0).XElement.Attributes("description").Value
+              End If
+              IO.File.WriteAllText(desktopINI, "[.ShellClassInfo]" & vbCrLf & _
+                                   "ConfirmFileOp=0" & vbCrLf & _
+                                   "IconFile=" & _candidates(0).XElement.Attributes("icon").Value & vbCrLf & _
+                                   "IconIndex=" & iconIndex & vbCrLf & _
+                                   "InfoTip=" & iconTip,
+                                   System.Text.Encoding.Unicode)
+              SetAttr(_path, FileAttribute.System)
+              SetAttr(desktopINI, FileAttribute.Hidden)
+            End If
+          End If
+        End If
+      End If
       blnFound = True
       '' Check if we're allowed to Handle Extensions now that we found the right structure
       If _pstruct.HandleExtensions And _type = PathType.File Then
@@ -1037,279 +949,6 @@ Public Class Path : Implements IDisposable
 
     Return blnFound
   End Function
-
-  Public Class StructureCandidateArray
-    Private _lst As New List(Of StructureCandidate)
-    Private _path As String
-
-    Default Public Property Item(ByVal Index As Integer) As StructureCandidate
-      Get
-        Return _lst(Index)
-      End Get
-      Set(value As StructureCandidate)
-        _lst(Index) = value
-      End Set
-    End Property
-    Public ReadOnly Property Items As List(Of StructureCandidate)
-      Get
-        Return _lst
-      End Get
-    End Property
-    Public ReadOnly Property Count As Integer
-      Get
-        Return _lst.Count
-      End Get
-    End Property
-
-    Public Sub New(ByVal Path As String)
-      _path = Path
-    End Sub
-
-    Public Sub Add(ByVal XPath As String)
-      If Not String.IsNullOrEmpty(XPath) Then
-        _lst.Add(New StructureCandidate(XPath, _path))
-      End If
-    End Sub
-    Public Sub Add(ByVal XElement As XmlElement)
-      _lst.Add(New StructureCandidate(XElement, _path))
-    End Sub
-    Public Sub Add(ByVal Candidate As StructureCandidate)
-      _lst.Add(Candidate)
-    End Sub
-    Public Sub AddRange(ByVal XNodes As XmlNodeList)
-      For i = 0 To XNodes.Count - 1 Step 1
-        _lst.Add(New StructureCandidate(XNodes(i), _path))
-      Next
-    End Sub
-    Public Sub AddRange(ByVal XPaths As String())
-      For i = 0 To XPaths.Length - 1 Step 1
-        _lst.Add(New StructureCandidate(XPaths(i), _path))
-      Next
-    End Sub
-    Public Sub AddRange(ByVal Candidates As StructureCandidate())
-      For i = 0 To Candidates.Length - 1 Step 1
-        _lst.Add(Candidates(i))
-      Next
-    End Sub
-    Public Sub AddRange(ByVal Candidates As List(Of StructureCandidate))
-      For i = 0 To Candidates.Count - 1 Step 1
-        _lst.Add(Candidates(i))
-      Next
-    End Sub
-    Public Sub RemoveAt(ByVal Index As Integer)
-      If Index < _lst.Count Then
-        _lst.RemoveAt(Index)
-      End If
-    End Sub
-    Public Sub Remove(ByVal Candidate As StructureCandidate)
-      _lst.Remove(Candidate)
-    End Sub
-
-    Public Function ToArray() As String()
-      Dim arr(_lst.Count - 1) As String
-      For i = 0 To _lst.Count - 1 Step 1
-        arr(i) = _lst(i).XPath
-      Next
-      Return arr
-    End Function
-
-    Public Sub RemoveMismatches(Optional ByVal MatchThreshold As Integer = 100)
-      For i = _lst.Count - 1 To 0 Step -1
-        If _lst(i).MatchPercentage < MatchThreshold Then
-          _lst.RemoveAt(i)
-        End If
-      Next
-    End Sub
-
-    Public Function GetHighestMatch() As StructureCandidate
-      Dim index As Integer = -1
-      For i = 0 To _lst.Count - 1 Step 1
-        If index = -1 Then index = i
-        If _lst(i).MatchPercentage > _lst(index).MatchPercentage Then index = i
-      Next
-      If index >= 0 Then
-        Return _lst(index)
-      Else
-        Return Nothing
-      End If
-    End Function
-  End Class
-  Public Class StructureCandidate
-    Private _x As XmlElement
-    Private _xpath, _path, _descr, _spath As String
-    Private _match As Boolean
-    Private _conf As Integer
-
-    ''' <summary>
-    ''' Gets the XPath for the candidate
-    ''' </summary>
-    ''' <value></value>
-    ''' <returns>String</returns>
-    ''' <remarks></remarks>
-    Public ReadOnly Property XPath As String
-      Get
-        Return _xpath
-      End Get
-    End Property
-    ''' <summary>
-    ''' Gets the XmlElement reference for the candidate
-    ''' </summary>
-    ''' <value></value>
-    ''' <returns>XmlElement</returns>
-    ''' <remarks></remarks>
-    Public ReadOnly Property XElement As XmlElement
-      Get
-        Return _x
-      End Get
-    End Property
-    ''' <summary>
-    ''' Gets the URI string based on the structures XPath
-    ''' </summary>
-    ''' <value></value>
-    ''' <returns>URI string</returns>
-    ''' <remarks></remarks>
-    Public ReadOnly Property StructurePath As String
-      Get
-        Return _spath
-      End Get
-    End Property
-    ''' <summary>
-    ''' Gets the objects URI string
-    ''' </summary>
-    ''' <value></value>
-    ''' <returns>URI string</returns>
-    ''' <remarks></remarks>
-    Public ReadOnly Property ObjectPath As String
-      Get
-        Return _path
-      End Get
-    End Property
-    ''' <summary>
-    ''' Gets the description as specified in the path structure
-    ''' </summary>
-    ''' <value></value>
-    ''' <returns>String</returns>
-    ''' <remarks></remarks>
-    Public ReadOnly Property StructureDescription As String
-      Get
-        Return _descr
-      End Get
-    End Property
-    Public ReadOnly Property IsMatch As Boolean
-      Get
-        Return _match
-      End Get
-    End Property
-    Public ReadOnly Property MatchPercentage As Integer
-      Get
-        Return _conf
-      End Get
-    End Property
-    ''' <summary>
-    ''' Gets the Path Structure object's name attribute
-    ''' </summary>
-    ''' <value></value>
-    ''' <returns></returns>
-    ''' <remarks></remarks>
-    Public ReadOnly Property PathName As String
-      Get
-        If _x.HasAttribute("name") Then
-          Return _x.Attributes("name").Value
-        Else
-          Return ""
-        End If
-      End Get
-    End Property
-
-    Public Sub New(ByVal xPath As String, ByVal fPath As String)
-      _x = _struct.SelectSingleNode(xPath)
-      _xpath = xPath
-      _path = fPath
-      _spath = _pstruct.GetURIfromXPath(_xpath)
-      _match = Match()
-      _descr = _pstruct.GetDescriptionfromXPath(_xpath)
-    End Sub
-    Public Sub New(ByVal xElement As XmlElement, ByVal fPath As String)
-      _x = xElement
-      _xpath = FindXPath(xElement)
-      _path = fPath
-      _spath = _pstruct.GetURIfromXPath(_xpath)
-      _match = Match()
-      _descr = _pstruct.GetDescriptionfromXPath(_xpath)
-    End Sub
-
-    Private Function Match() As Boolean
-      _conf = -1
-      Dim msg As New StringBuilder
-      Dim strTemp As String = _path
-      '' Fix if a file
-      If strTemp.LastIndexOf(".") > strTemp.LastIndexOf("\") Then strTemp = strTemp.Remove(strTemp.LastIndexOf("."))
-
-      '' Iterate through each character and compare. Watch out for variables and peek into _path for next character
-      Dim s As String() = _pstruct.ReplaceVariables(_spath, _path).Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
-      Dim f As String() = strTemp.Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
-      Dim si As Integer
-      msg.AppendLine("Comparing '" & SurroundJoin(s, "[", "]") & "'(" & s.Length.ToString & ") to '" & SurroundJoin(f, "[", "]") & "'(" & f.Length.ToString & ")")
-      msg.AppendLine("XPath: " & _xpath)
-      If s.Length = f.Length Then
-        For i = 0 To s.Length - 1 Step 1
-          msg.AppendLine(vbTab & "(" & i.ToString & ")'" & s(i) & "' = '" & f(i) & "'")
-          If i < f.Length Then
-            If s(i).IndexOf("{") >= 0 And s(i).IndexOf("}") >= 0 Then
-              '' Iterate through each character and compare. Watch out for variables and peek into _path for next character
-              si = 0
-              For j = 0 To f(i).Length - 1 Step 1
-                If String.Equals(s(i)(si), "{") Then
-                  Do Until String.Equals(s(i)(si), "}") Or si = (s(i).Length - 1) '' Try to skip to the end of the variable
-                    si += 1
-                  Loop
-                  If Not si = (s(i).Length - 1) Then si += 1 '' Move index just past the end of the variable
-                  Do Until String.Equals(f(i)(j), s(i)(si), StringComparison.OrdinalIgnoreCase) Or (j = f(i).Length - 1) '' Try to get to the next matching character or end of string
-                    j += 1
-                  Loop
-                End If
-                msg.AppendLine("'" & s(i)(si) & "'(" & si.ToString & "/" & (s(i).Length - 1).ToString & ") = '" & f(i)(j) & "'(" & j.ToString & "/" & (f(i).Length - 1).ToString & ")")
-                '' If the last string is '}' then it doesn't matter, continue without error
-                If (si = (s(i).Length - 1)) And String.Equals(s(i)(si), "}") Then
-                  Continue For
-                End If
-                '' Now check if the current character is equal at all. If not, then setup confidence score. Skip if both indices are at end
-                'If Not (j = (f(i).Length - 1)) And (si = (s(i).Length - 1)) Then
-                If Not String.Equals(s(i)(si), f(i)(j), StringComparison.OrdinalIgnoreCase) Then
-                  _conf = (((i / (s.Length)) * 100) + ((j / (f(i).Length)) * 10)) '' Confidence score 1's
-                  Exit For
-                Else
-                  If Not (si = (s(i).Length - 1)) Then
-                    si += 1 '' Increment the structure index
-                  End If
-                End If
-                'End If
-              Next
-              If Not si = (s(i).Length - 1) Then '' Check if the standard was incomplete, meaning that the object path didn't have the next required character
-                _conf = (i / (s.Length)) * 100 '' Confidence score 10's
-              End If
-              If _conf > -1 Then '' If the confidence has changed, exit the loop as it has failed
-                Exit For
-              End If
-            ElseIf Not String.Equals(s(i), f(i), StringComparison.OrdinalIgnoreCase) Then '' Full comparison check
-              _conf = (i / (s.Length)) * 100 '' Confidence score 10's
-              Exit For
-            End If
-          End If
-        Next
-      Else
-        _conf = 0 '' Ensure positive
-      End If
-      msg.AppendLine(vbTab & "Match percentage: " & _conf.ToString)
-      'Debug.WriteLine(msg.ToString)
-      If _conf = -1 Then
-        _conf = 100
-        Return True
-      Else
-        Return False
-      End If
-    End Function
-  End Class
 
   ''' <summary>
   ''' Determines if the current path is valid according to the provided Path Structure node.
@@ -1371,24 +1010,18 @@ Public Class Path : Implements IDisposable
 
   Public Function FindNearestArchive(Optional ByVal FocusPath As Path = Nothing) As String
     If FocusPath Is Nothing Then FocusPath = Me
-    Log(New String(vbTab, 2) & "FocusPath: " & FocusPath.UNCPath & vbTab & FocusPath.Type.ToString)
     If FocusPath.Type = PathType.Folder Then
       For i = 0 To FocusPath.Children.Length - 1 Step 1
-        Log(New String(vbTab, 2) & "Find Archive: " & FocusPath.Children(i).PathName)
         If FocusPath.Children(i).PathName.IndexOf("Archive", StringComparison.OrdinalIgnoreCase) >= 0 And FocusPath.Children(i).Type = PathType.Folder Then
           Return FocusPath.Children(i).UNCPath
         End If
       Next
     End If
-    'If FocusPath.Parent IsNot Nothing Then
     If _pstruct.IsInDefaultPath(FocusPath.Parent.UNCPath) Then
       Return FindNearestArchive(FocusPath.Parent)
     Else
       Return Me.CurrentDirectory
     End If
-    'Else
-    'Return Me.CurrentDirectory
-    'End If
   End Function
 
   Public Sub LogData(ByVal ChangedPath As String, ByVal Method As String)
@@ -1401,11 +1034,13 @@ Public Class Path : Implements IDisposable
   End Sub
 
   Public Class AuditVisualReport
+    Implements IDisposable
+
     Private _report As HTML.HTMLWriter
     Private _fileCount As Integer
     Private _errPaths, _optPaths As List(Of String)
     Private fileSystem As HTML.HTMLWriter.HTMLList
-    Private _path As Path
+    Private _auditpath As Path
     Private ERPVariables As New SortedList(Of String, String)
     Private _quit As Boolean = False
 
@@ -1468,8 +1103,9 @@ Public Class Path : Implements IDisposable
 
     Public Sub New(ByVal Path As Path)
       _report = New HTML.HTMLWriter
-      _path = Path
+      _auditpath = Path
       fileSystem = New HTMLList(HTMLList.ListType.Unordered)
+      'Log("Audit initialized at '" & _auditpath.UNCPath & "'")
     End Sub
 
     Public Enum StatusCode
@@ -1544,58 +1180,83 @@ Public Class Path : Implements IDisposable
     End Sub
 
     Public Sub Audit()
+      'Log("Audit began")
       Dim found As Boolean = True '' Determines whether any valid locations were found, assume false
       Dim cand As StructureCandidate
 
       Dim li As HTMLList.ListItem
       Dim ul As HTMLList
 
-      _path.IsNameStructured() '' Don't run in logic check because we're applying our own logic
-      cand = _path.StructureCandidates.GetHighestMatch()
+      _auditpath.IsNameStructured() '' Don't run in logic check because we're applying our own logic
+      cand = _auditpath.StructureCandidates.GetHighestMatch()
       If cand IsNot Nothing Then
-        If _path.Variables.ContainsName(cand.PathName) Then '' Check that this path needs to be verified, then verify it in the ERP system.
-          If Not _path.Variables.IsValid(cand.StructurePath) Then
-            li = Report("'" & _path.UNCPath & "' was not valid in the ERP system",
+        '' Because a solid candidate was found, we should re-initialize the current path's variables by calling "CheckVariables"
+        cand.CheckForLinkVariables()
+        If _auditpath.Variables.ContainsName(cand.PathName) Then
+          If Not _auditpath.Variables.IsValid(cand.StructurePath) Then
+            '' Check that this path needs to be verified, then verify it in the ERP system.
+
+            li = Report("'" & _auditpath.UNCPath & "' was not valid in the ERP system",
                           AuditVisualReport.StatusCode.InvalidPath,
-                          _path)
+                          _auditpath)
+            Dim out As New StringBuilder()
+            For z = 0 To _auditpath.Variables.Count - 1 Step 1
+              out.AppendLine(_auditpath.Variables(z).Name & "=" & _auditpath.Variables(z).Value)
+            Next
+            'Log("'" & _auditpath.UNCPath & "' not found in ERP system. Variables: " & vbLf & out.ToString)
             found = False
           End If
         End If
-        If cand.MatchPercentage = 100 Or _path.StructureCandidates.Count = 1 And found Then
-          li = Report("'" & cand.ObjectPath & "' matched " & cand.MatchPercentage.ToString & "%. '" & cand.StructurePath & "':" & cand.StructureDescription,
-                        AuditVisualReport.StatusCode.ValidPath,
-                        _path)
-        Else
-          li = Report("'" & cand.ObjectPath & "' matched " & cand.MatchPercentage.ToString & "%, but there were too many similar paths '" & SurroundJoin(_path.StructureCandidates.ToArray, " {", "} ") & "'",
-                        AuditVisualReport.StatusCode.Other,
-                        _path)
+        If found Then
+          If cand.MatchPercentage = 100 Then
+            li = Report("'" & cand.UNCPath & "' matched " & cand.MatchPercentage.ToString & "% '" & cand.StructurePath & "':" & cand.StructureDescription,
+                          AuditVisualReport.StatusCode.ValidPath,
+                          _auditpath)
+          Else
+            li = Report("'" & cand.UNCPath & "' matched " & cand.MatchPercentage.ToString & "%, but was not high enough. Here are all of the candidates '" & SurroundJoin(_auditpath.StructureCandidates.ToArray, " {", "} ") & "'",
+                          AuditVisualReport.StatusCode.Other,
+                          _auditpath)
+          End If
+        End If
+        If _auditpath.Type = PathType.Folder Then
+          '' If the folder is a "FreeForm" folder (meaning that it can have whatever files/folders) then leave it alone
+          If cand.XElement.HasAttribute("freeform") Then
+            If String.Equals(cand.XElement.Attributes("freeform").Value, "true", StringComparison.OrdinalIgnoreCase) Then
+              found = False '' This will allow iteration of child objects to be skipped.
+              'Log("Freeform folder found at '" & _auditpath.UNCPath & "'. Force exiting the audit of this directory")
+            End If
+          End If
         End If
       Else
-        li = Report("'" & _path.UNCPath & "' does not adhere to any paths.",
+        li = Report("'" & _auditpath.UNCPath & "' does not adhere to any paths.",
                       AuditVisualReport.StatusCode.InvalidPath,
-                      _path)
+                      _auditpath)
+        found = False
       End If
 
       '' Check status of children paths
-      If Not IsNothing(_path.Children) And found Then
-
-        ul = CreateNewList(_path)
-        For i = 0 To _path.Children.Length - 1 Step 1
+      If Not IsNothing(_auditpath.Children) And found Then
+        ul = CreateNewList(_auditpath)
+        For i = 0 To _auditpath.Children.Length - 1 Step 1
           Dim cli As HTMLList.ListItem
           FileCount += 1
           '' Check if user wants Thumbs.Db deleted
           If _pstruct.AllowDeletionOfThumbsDb Then ' My.Settings.blnDeleteThumbsDb Then
-            If _path.Children(i).Type = PathType.File And String.Equals(_path.Children(i).PathName, "thumbs", StringComparison.OrdinalIgnoreCase) And String.Equals(_path.Children(i).Extension, ".db", StringComparison.OrdinalIgnoreCase) Then
-              IO.File.Delete(_path.Children(i).UNCPath)
-              cli = Report("Deleted Thumbs.Db from '" & _path.Children(i).UNCPath & "'.",
+            If _auditpath.Children(i).Type = PathType.File And _auditpath.Children(i).PathName.IndexOf("thumbs", StringComparison.OrdinalIgnoreCase) >= 0 And _auditpath.Children(i).Extension.IndexOf(".db", StringComparison.OrdinalIgnoreCase) >= 0 Then
+              IO.File.Delete(_auditpath.Children(i).UNCPath)
+              cli = Report("Deleted Thumbs.Db from '" & _auditpath.Children(i).UNCPath & "'.",
                             AuditVisualReport.StatusCode.Other,
-                            _path.Children(i))
+                            _auditpath.Children(i))
               AddListItemToList(ul, cli)
               Continue For
             End If
           End If
-          AuditVisualChildren(ul, _path.Children(i))
-          RaiseEvent ChildAudited(New AuditedEventArgs(Me, _path.Children(i).UNCPath, i, _path.Children.Length))
+          If _auditpath.Children(i).Type = PathType.File And _auditpath.Children(i).PathName.IndexOf("desktop", StringComparison.OrdinalIgnoreCase) >= 0 And _auditpath.Children(i).Extension.IndexOf(".ini", StringComparison.OrdinalIgnoreCase) >= 0 Then
+            '' Ignore these files because we sometimes create them!
+            Continue For
+          End If
+          AuditVisualChildren(ul, _auditpath.Children(i))
+          RaiseEvent ChildAudited(New AuditedEventArgs(Me, _auditpath.Children(i).UNCPath, i, _auditpath.Children.Length))
           If _quit Then
             '' Add final objects
             Exit For
@@ -1608,6 +1269,7 @@ Public Class Path : Implements IDisposable
       AddListItemToList(Nothing, li)
     End Sub
     Private Sub AuditVisualChildren(ByRef ParentList As HTMLList, ByVal Child As Path)
+      'Log(vbTab & "Audit started for path '" & Child.UNCPath & "'")
       Dim found As Boolean = True '' Determines whether any valid locations were found, assume false
       Dim cand As StructureCandidate
 
@@ -1617,39 +1279,59 @@ Public Class Path : Implements IDisposable
       Child.IsNameStructured() '' Don't run in logic check because we're applying our own logic
       cand = Child.StructureCandidates.GetHighestMatch()
       If cand IsNot Nothing Then
-        If _path.Variables.ContainsName(cand.PathName) Then
+        '' Because a solid candidate was found, we should re-initialize the current path's variables by calling "CheckVariables"
+        cand.CheckForLinkVariables()
+        If Child.Variables.ContainsName(cand.PathName) Then
           If Not Child.Variables.IsValid(cand.StructurePath) Then
             '' Check that this path needs to be verified, then verify it in the ERP system.
 
             li = Report("'" & Child.UNCPath & "' was not valid in the ERP system",
                           AuditVisualReport.StatusCode.InvalidPath,
                           Child)
+            Dim out As New StringBuilder()
+            For z = 0 To Child.Variables.Count - 1 Step 1
+              out.AppendLine(Child.Variables(z).Name & "=" & Child.Variables(z).Value)
+            Next
+            'Log("'" & Child.UNCPath & "' not found in ERP system. Variables: " & vbLf & out.ToString)
             found = False
           End If
         End If
-        If cand.MatchPercentage = 100 Or Child.StructureCandidates.Count = 1 And found Then
-          li = Report("'" & cand.ObjectPath & "' matched " & cand.MatchPercentage.ToString & "% '" & cand.StructurePath & "':" & cand.StructureDescription,
-                        AuditVisualReport.StatusCode.ValidPath,
-                        Child)
-        Else
-          li = Report("'" & cand.ObjectPath & "' matched " & cand.MatchPercentage.ToString & "%, but there were too many similar paths '" & SurroundJoin(Child.StructureCandidates.ToArray, " {", "} ") & "'",
-                        AuditVisualReport.StatusCode.Other,
-                        Child)
+        If found Then
+          If cand.MatchPercentage = 100 Then
+            li = Report("'" & cand.UNCPath & "' matched " & cand.MatchPercentage.ToString & "% '" & cand.StructurePath & "':" & cand.StructureDescription,
+                          AuditVisualReport.StatusCode.ValidPath,
+                          Child)
+          Else
+            li = Report("'" & cand.UNCPath & "' matched " & cand.MatchPercentage.ToString & "%, but was not high enough. Here are all of the candidates '" & SurroundJoin(Child.StructureCandidates.ToArray, " {", "} ") & "'",
+                          AuditVisualReport.StatusCode.Other,
+                          Child)
+          End If
+        End If
+        If Child.Type = PathType.Folder Then
+          '' If the folder is a "FreeForm" folder (meaning that it can have whatever files/folders) then leave it alone
+          If cand.XElement.HasAttribute("freeform") Then
+            If String.Equals(cand.XElement.Attributes("freeform").Value, "true", StringComparison.OrdinalIgnoreCase) Then
+              found = False '' This will allow iteration of child objects to be skipped.
+              'Log("Freeform folder found at '" & Child.UNCPath & "'. Force exiting the audit of this directory")
+            End If
+          End If
         End If
       Else
         li = Report("'" & Child.UNCPath & "' does not adhere to any paths.",
                       AuditVisualReport.StatusCode.InvalidPath,
                       Child)
+        found = False
       End If
 
       If Child.Children IsNot Nothing And found Then
         ul = CreateNewList(Child)
+        'Log("'" & Child.UNCPath & "' has " & Child.Children.Length.ToString & " children")
         For i = 0 To Child.Children.Length - 1 Step 1
           Dim cli As HTMLList.ListItem
           '' Check if user wants Thumbs.Db deleted
           FileCount += 1
           If _pstruct.AllowDeletionOfThumbsDb Then ' My.Settings.blnDeleteThumbsDb Then
-            If Child.Type = PathType.File And String.Equals(Child.PathName, "thumbs", StringComparison.OrdinalIgnoreCase) And String.Equals(Child.Extension, ".db", StringComparison.OrdinalIgnoreCase) Then
+            If Child.Children(i).Type = PathType.File And Child.Children(i).PathName.IndexOf("thumbs", StringComparison.OrdinalIgnoreCase) >= 0 And Child.Extension.IndexOf(".db", StringComparison.OrdinalIgnoreCase) >= 0 Then
               IO.File.Delete(Child.Children(i).UNCPath)
               cli = Report("Deleted Thumbs.Db from '" & Child.Children(i).UNCPath & "'.",
                             AuditVisualReport.StatusCode.Other,
@@ -1658,20 +1340,22 @@ Public Class Path : Implements IDisposable
               Continue For
             End If
           End If
-          '' Setup thread
-          'If System.Math.Round((My.Computer.Info.AvailablePhysicalMemory / (1024 * 1024)), 2) > 2000 Then
-          '  Dim thrd As New System.Threading.Thread(AddressOf ThreadGrandChildren)
-          '  thrd.Start({ul, Child.Children(i), i, Child.Children.Count})
-          'Else
+          If Child.Children(i).Type = PathType.File And Child.Children(i).PathName.IndexOf("desktop", StringComparison.OrdinalIgnoreCase) >= 0 And Child.Children(i).Extension.IndexOf(".ini", StringComparison.OrdinalIgnoreCase) >= 0 Then
+            '' Ignore these files because we sometimes create them!
+            Continue For
+          End If
           AuditVisualChildren(ul, Child.Children(i))
           RaiseEvent GrandChildAudited(New AuditedEventArgs(Me, Child.Children(i).UNCPath, i, Child.Children.Length))
-          'End If
           If _quit Then
             '' Add final objects and exit
             Exit For
           End If
         Next
         AddListToListItem(li, ul)
+      ElseIf Child.Children Is Nothing Then
+        'Log(Child.UNCPath & " has no children")
+      ElseIf Not found Then
+        'Log("Not found triggered for '" & Child.UNCPath & "'")
       End If
 
       '' Add item to main list
@@ -1685,6 +1369,46 @@ Public Class Path : Implements IDisposable
     Public Sub Quit()
       _quit = True
     End Sub
+
+#Region "IDisposable Support"
+    Private disposedValue As Boolean ' To detect redundant calls
+
+    ' IDisposable
+    Protected Overridable Sub Dispose(disposing As Boolean)
+      If Not Me.disposedValue Then
+        If disposing Then
+          ' TODO: dispose managed state (managed objects).
+          _report.Dispose()
+          _fileCount = Nothing
+          _errPaths = Nothing
+          _optPaths = Nothing
+          fileSystem = Nothing
+          _auditpath = Nothing
+          ERPVariables = Nothing
+          _quit = Nothing
+        End If
+
+        ' TODO: free unmanaged resources (unmanaged objects) and override Finalize() below.
+        ' TODO: set large fields to null.
+      End If
+      Me.disposedValue = True
+    End Sub
+
+    ' TODO: override Finalize() only if Dispose(ByVal disposing As Boolean) above has code to free unmanaged resources.
+    'Protected Overrides Sub Finalize()
+    '    ' Do not change this code.  Put cleanup code in Dispose(ByVal disposing As Boolean) above.
+    '    Dispose(False)
+    '    MyBase.Finalize()
+    'End Sub
+
+    ' This code added by Visual Basic to correctly implement the disposable pattern.
+    Public Sub Dispose() Implements IDisposable.Dispose
+      ' Do not change this code.  Put cleanup code in Dispose(disposing As Boolean) above.
+      Dispose(True)
+      GC.SuppressFinalize(Me)
+    End Sub
+#End Region
+
   End Class
 
   ''' <summary>
@@ -1734,14 +1458,21 @@ Public Class Path : Implements IDisposable
     If Not Me.disposedValue Then
       If disposing Then
         ' TODO: dispose managed state (managed objects).
-        _path = String.Empty
+        _type = Nothing
+        _path = Nothing
+        _struct = Nothing
         _infoFile = Nothing
         _infoFolder = Nothing
-        _defaultPath = String.Empty
-        _startPath = String.Empty
+        myXML = Nothing
+        _defaultPath = Nothing
+        _startPath = Nothing
         _variables = Nothing
         _parent = Nothing
         _children = Nothing
+        _candidates = Nothing
+        _pstruct = Nothing
+        _exts = Nothing
+        _users = Nothing
       End If
 
       ' TODO: free unmanaged resources (unmanaged objects) and override Finalize() below.
@@ -1751,11 +1482,11 @@ Public Class Path : Implements IDisposable
   End Sub
 
   ' TODO: override Finalize() only if Dispose(ByVal disposing As Boolean) above has code to free unmanaged resources.
-  Protected Overrides Sub Finalize()
-    ' Do not change this code.  Put cleanup code in Dispose(ByVal disposing As Boolean) above.
-    Dispose(False)
-    MyBase.Finalize()
-  End Sub
+  'Protected Overrides Sub Finalize()
+  '    ' Do not change this code.  Put cleanup code in Dispose(ByVal disposing As Boolean) above.
+  '    Dispose(False)
+  '    MyBase.Finalize()
+  'End Sub
 
   ' This code added by Visual Basic to correctly implement the disposable pattern.
   Public Sub Dispose() Implements IDisposable.Dispose
@@ -1767,6 +1498,661 @@ Public Class Path : Implements IDisposable
 
 End Class
 
+Public Class VariableArray
+  Private _x As XmlElement
+  Private _refpath As PathStructureClass.Path
+  Private _lst As New List(Of Variable)
+
+  Default Public Property Item(ByVal Index As Integer) As Variable
+    Get
+      Return _lst(Index)
+    End Get
+    Set(value As Variable)
+      _lst(Index) = value
+    End Set
+  End Property
+  Default Public Property Item(ByVal Name As String) As Variable
+    Get
+      Dim v As Variable = Nothing
+      For i = 0 To _lst.Count - 1 Step 1
+        If String.Equals(_lst(i).Name, Name, StringComparison.OrdinalIgnoreCase) Then
+          v = _lst(i)
+          Exit For
+        End If
+      Next
+      Return v
+    End Get
+    Set(value As Variable)
+      Dim v As Variable = Nothing
+      For i = 0 To _lst.Count - 1 Step 1
+        If String.Equals(_lst(i).Name, Name, StringComparison.OrdinalIgnoreCase) Then
+          _lst(i) = value
+          Exit For
+        End If
+      Next
+    End Set
+  End Property
+  Public ReadOnly Property Count As Integer
+    Get
+      Return _lst.Count
+    End Get
+  End Property
+  Public ReadOnly Property Items As Variable()
+    Get
+      Return _lst.ToArray
+    End Get
+  End Property
+
+  Public Sub New(ByVal XPath As String, ByVal Path As PathStructureClass.Path)
+    _x = Path.PathStructure.SelectSingleNode(XPath)
+    _refpath = Path
+    If _x IsNot Nothing Then
+      If _x.HasChildNodes Then
+        AddRange(_x.SelectNodes("Variable"))
+      End If
+    End If
+
+    'Log(New String("*", 20) & " New Path '" & _refpath.UNCPath & "'" & New String("*", 20))
+  End Sub
+  Public Sub New(ByVal XElement As XmlElement, ByVal Path As PathStructureClass.Path)
+    _x = XElement
+    _refpath = Path
+    If _x IsNot Nothing Then
+      If _x.HasChildNodes Then
+        AddRange(_x.SelectNodes("Variable"))
+      End If
+    End If
+
+    'Log(New String("*", 20) & " New Path '" & _refpath.UNCPath & "'" & New String("*", 20))
+  End Sub
+
+  Public Sub Initialize()
+    _lst = New List(Of Variable)
+    If _x IsNot Nothing Then
+      If _x.HasChildNodes Then
+        AddRange(_x.SelectNodes("Variable"))
+      End If
+    End If
+  End Sub
+
+  Private Sub Add(ByVal XPath As String)
+    _lst.Add(New Variable(XPath, _refpath))
+  End Sub
+  Private Sub Add(ByVal XElement As XmlElement)
+    _lst.Add(New Variable(XElement, _refpath))
+  End Sub
+  Private Sub AddRange(ByVal XPaths As String())
+    For i = 0 To XPaths.Length - 1 Step 1
+      _lst.Add(New Variable(XPaths(i), _refpath))
+    Next
+  End Sub
+  Private Sub AddRange(ByVal XElements As XmlNodeList)
+    For i = 0 To XElements.Count - 1 Step 1
+      _lst.Add(New Variable(XElements(i), _refpath))
+    Next
+  End Sub
+
+  Public Function Replace(ByVal Input As String) As String
+    If _lst.Count > 0 Then
+      For i = 0 To _lst.Count - 1 Step 1
+        Input = _lst(i).Replace(Input)
+      Next
+    End If
+    Return Input
+  End Function
+
+  Public Function IsValid(ByVal Input As String) As Boolean
+    Dim blnValid As Boolean = True
+    Dim tmp As Boolean
+    For i = 0 To _lst.Count - 1 Step 1
+      tmp = _lst(i).HasVariable(Input)
+      'Debug.WriteLine("Input has variable? " & tmp.ToString & " (" & _lst(i).Name & ")(" & Input & ")")
+      If tmp Then
+        If Not _lst(i).IsValid() Then
+          blnValid = False
+          Exit For
+        End If
+      End If
+    Next
+    Return blnValid
+  End Function
+
+  Public Function ContainsName(ByVal PathName As String) As Boolean
+    Dim fnd As Boolean = False
+    For i = 0 To _lst.Count - 1 Step 1
+      If PathName.IndexOf(_lst(i).Name, System.StringComparison.OrdinalIgnoreCase) >= 0 Then ' String.Equals(, PathName, StringComparison.OrdinalIgnoreCase) Then
+        fnd = True
+        Exit For
+      End If
+    Next
+    Return fnd
+  End Function
+  Public Function EndsWithName(ByVal PathName As String) As Boolean
+    Dim fnd As Boolean = False
+    For i = 0 To _lst.Count - 1 Step 1
+      '' Check that the index of the variable name is towards the end. There is a tolerance of 2 characters
+      If PathName.LastIndexOf(_lst(i).Name, System.StringComparison.OrdinalIgnoreCase) >= (PathName.Length - _lst(i).Name.Length - 2) Then ' String.Equals(_lst(i).Name, PathName, StringComparison.OrdinalIgnoreCase) Then
+        fnd = True
+        Exit For
+      End If
+    Next
+    Return fnd
+  End Function
+End Class
+Public Class Variable
+  Private _x As XmlElement
+  Private _name, _erptable As String
+  Private _index As Integer
+  Private _cmds As New List(Of ERPCommand)
+  Private _refVarPath As Path
+  Public ReadOnly Property Value As String
+    Get
+      Dim nodes As String() = _refVarPath.UNCPath.Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
+      If _index < nodes.Length Then
+        Return nodes(_index)
+      Else
+        'Log("Index is outside bounds of the array. " & _name & " at index " & _index.ToString & "/" & nodes.Length.ToString & " from variable path '" & _refVarPath.UNCPath & "'")
+        Return ""
+      End If
+    End Get
+  End Property
+  Public ReadOnly Property Name As String
+    Get
+      Return _name
+    End Get
+  End Property
+  Public Property Index As Integer
+    Get
+      Return _index
+    End Get
+    Set(value As Integer)
+      _index = value
+    End Set
+  End Property
+
+  Public Sub New(ByVal XPath As String, ByVal Path As Path)
+    _x = Path.PathStructure.SelectSingleNode(XPath)
+    _name = _x.Attributes("name").Value
+    If _x.HasAttribute("erp") Then
+      _erptable = _x.Attributes("erp").Value
+    End If
+    _index = Convert.ToInt32(_x.Attributes("pathindex").Value)
+    If _x.HasChildNodes Then
+      Dim cmds As XmlNodeList = _x.ChildNodes '.SelectNodes("ERPCommand")
+      For i = 0 To cmds.Count - 1 Step 1
+        _cmds.Add(New ERPCommand(cmds(i)))
+      Next
+    End If
+    _refVarPath = Path
+  End Sub
+  Public Sub New(ByVal XElement As XmlElement, ByVal Path As Path)
+    _x = XElement
+    _name = _x.Attributes("name").Value
+    If _x.HasAttribute("erp") Then
+      _erptable = _x.Attributes("erp").Value
+    End If
+    _index = Convert.ToInt32(_x.Attributes("pathindex").Value)
+    If _x.HasChildNodes Then
+      Dim cmds As XmlNodeList = _x.ChildNodes '.SelectNodes("ERPCommand")
+      For i = 0 To cmds.Count - 1 Step 1
+        _cmds.Add(New ERPCommand(cmds(i)))
+      Next
+    End If
+    _refVarPath = Path
+  End Sub
+
+  Public Function HasVariable(ByVal Input As String) As Boolean
+    Return (Input.IndexOf(_name) >= 0)
+  End Function
+
+  Public Function IsValid() As Boolean
+    Dim blnFound As Boolean = False
+    If _refVarPath.GetPathStructure.CheckERPSystem Then ' My.Settings.blnERPCheck Then
+      Dim cond As String
+      Dim selFields As String
+      For i = 0 To _cmds.Count - 1 Step 1
+        If _cmds(i).IsOR Then '' Check if the command has an OR operator
+          selFields += String.Join(",", _cmds(i).Fields) & ","
+          cond += "(" & _cmds(i).Fields.SurroundJoin("", "='" & Replace(_cmds(i).Value).Replace("'", "''") & "' OR ", True) & ")"
+          If cond.EndsWith(" OR )") Then cond = cond.Remove(cond.LastIndexOf(" OR )")) & ")"
+        Else
+          selFields += _cmds(i).Field & ","
+          cond += _cmds(i).Field & "='" & Replace(_cmds(i).Value).Replace("'", "''") & "' AND "
+        End If
+      Next
+      If selFields.LastIndexOf(",") = selFields.Length - 1 Then selFields = selFields.Remove(selFields.Length - 1)
+      If cond.EndsWith(" AND ") Then cond = cond.Remove(cond.LastIndexOf(" AND "))
+      cond = cond.Replace("{", "").Replace("}", "")
+
+      If _refVarPath.GetPathStructure.ERPConnection.Successful Then ' ERPConnection.Successful Then
+        blnFound = _refVarPath.GetPathStructure.ERPConnection.CommandHasValues("SELECT " & selFields & " FROM [" & _erptable & "] WHERE " & cond & ";") 'ERPConnection.CommandHasValues("SELECT " & selFields & " FROM [" & _erptable & "] WHERE " & cond & ";")
+      Else
+        Log("Connection to ERP system unsuccessful!")
+      End If
+    Else
+      blnFound = True '' Set to true if the flag isn't even set. No need to raise alarm
+    End If
+    Return blnFound
+  End Function
+
+  Public Function Replace(ByVal Input As String) As String
+    If Not String.IsNullOrEmpty(Input) Then
+      If Input.IndexOf(_name, System.StringComparison.OrdinalIgnoreCase) >= 0 Then
+        Input = Input.Replace(_name, Me.Value)
+      End If
+    End If
+    Return Input
+  End Function
+
+  Public Class ERPCommand
+    Private _x As XmlElement
+    Private _rawcmd As String
+    Public ReadOnly Property Field As String
+      Get
+        Return _rawcmd.Remove(_rawcmd.IndexOf("="))
+      End Get
+    End Property
+    Public ReadOnly Property Value As String
+      Get
+        Return _rawcmd.Remove(0, _rawcmd.IndexOf("=") + 1)
+      End Get
+    End Property
+    Public ReadOnly Property IsOR As Boolean
+      Get
+        Return (Field.IndexOf("||") >= 0)
+      End Get
+    End Property
+    Public ReadOnly Property Fields As String()
+      Get
+        Return Field.Split({"||"}, System.StringSplitOptions.RemoveEmptyEntries)
+      End Get
+    End Property
+
+    Public Sub New(ByVal XElement As XmlElement)
+      _x = XElement
+      _rawcmd = _x.InnerText
+    End Sub
+  End Class
+End Class
+
+Public Class StructureCandidateArray
+  Private _lst As New List(Of StructureCandidate)
+  Private _structarrpath As String
+  Private _refPath As PathStructureClass.Path
+
+  Default Public Property Item(ByVal Index As Integer) As StructureCandidate
+    Get
+      Return _lst(Index)
+    End Get
+    Set(value As StructureCandidate)
+      _lst(Index) = value
+    End Set
+  End Property
+  Public ReadOnly Property Items As List(Of StructureCandidate)
+    Get
+      Return _lst
+    End Get
+  End Property
+  Public ReadOnly Property Count As Integer
+    Get
+      Return _lst.Count
+    End Get
+  End Property
+
+  Public Sub New(ByVal ReferencePath As PathStructureClass.Path)
+    'Log(vbTab & "StructureCandidateArray initialized with path '" & ReferencePath.UNCPath & "'")
+    _refPath = ReferencePath
+    _structarrpath = _refPath.UNCPath
+  End Sub
+
+  Public Sub Add(ByVal XPath As String)
+    If Not String.IsNullOrEmpty(XPath) Then
+      _lst.Add(New StructureCandidate(XPath, _refPath))
+    End If
+  End Sub
+  Public Sub Add(ByVal XElement As XmlElement)
+    _lst.Add(New StructureCandidate(XElement, _refPath))
+  End Sub
+  Public Sub Add(ByVal Candidate As StructureCandidate)
+    _lst.Add(Candidate)
+  End Sub
+  Public Sub AddRange(ByVal XNodes As XmlNodeList)
+    For i = 0 To XNodes.Count - 1 Step 1
+      _lst.Add(New StructureCandidate(XNodes(i), _refPath))
+    Next
+  End Sub
+  Public Sub AddRange(ByVal XPaths As String())
+    For i = 0 To XPaths.Length - 1 Step 1
+      _lst.Add(New StructureCandidate(XPaths(i), _refPath))
+    Next
+  End Sub
+  Public Sub AddRange(ByVal Candidates As StructureCandidate())
+    For i = 0 To Candidates.Length - 1 Step 1
+      _lst.Add(Candidates(i))
+    Next
+  End Sub
+  Public Sub AddRange(ByVal Candidates As List(Of StructureCandidate))
+    For i = 0 To Candidates.Count - 1 Step 1
+      _lst.Add(Candidates(i))
+    Next
+  End Sub
+  Public Sub RemoveAt(ByVal Index As Integer)
+    If Index < _lst.Count Then
+      _lst.RemoveAt(Index)
+    End If
+  End Sub
+  Public Sub Remove(ByVal Candidate As StructureCandidate)
+    _lst.Remove(Candidate)
+  End Sub
+
+  Public Function ToArray() As String()
+    Dim arr(_lst.Count - 1) As String
+    For i = 0 To _lst.Count - 1 Step 1
+      arr(i) = _lst(i).XPath
+    Next
+    Return arr
+  End Function
+
+  Public Sub RemoveMismatches(Optional ByVal MatchThreshold As Integer = 100)
+    For i = _lst.Count - 1 To 0 Step -1
+      If _lst(i).MatchPercentage < MatchThreshold Then
+        _lst.RemoveAt(i)
+      End If
+    Next
+  End Sub
+
+  Public Function GetHighestMatch() As StructureCandidate
+    Dim index As Integer = -1
+    For i = 0 To _lst.Count - 1 Step 1
+      If index = -1 Then index = i
+      If _lst(i).MatchPercentage > _lst(index).MatchPercentage Then index = i
+    Next
+    If index >= 0 Then
+      Return _lst(index)
+    Else
+      Return Nothing
+    End If
+  End Function
+End Class
+''' <summary>
+''' A candidate object used to determine if the provided UNC path matches the provided Path Structure path.
+''' </summary>
+''' <remarks></remarks>
+Public Class StructureCandidate
+  Private _x As XmlElement
+  Private _xpath, _descr, _spath As String
+  Private _structpath As Path
+  Private _match As Boolean
+  Private _conf As Integer
+
+  ''' <summary>
+  ''' Gets the XPath for the candidate
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>String</returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property XPath As String
+    Get
+      Return _xpath
+    End Get
+  End Property
+  ''' <summary>
+  ''' Gets the XmlElement reference for the candidate
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>XmlElement</returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property XElement As XmlElement
+    Get
+      Return _x
+    End Get
+  End Property
+  ''' <summary>
+  ''' Gets the URI string based on the structures XPath
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>URI string</returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property StructurePath As String
+    Get
+      Return _spath
+    End Get
+  End Property
+  ''' <summary>
+  ''' Gets the objects URI string
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>URI string</returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property UNCPath As String
+    Get
+      Return _structpath.UNCPath
+    End Get
+  End Property
+  ''' <summary>
+  ''' Gets the reference path for the current candidate.
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property ReferencePath As Path
+    Get
+      Return _structpath
+    End Get
+  End Property
+  ''' <summary>
+  ''' Gets the description as specified in the path structure
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>String</returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property StructureDescription As String
+    Get
+      If String.IsNullOrEmpty(_descr) Then
+        _descr = _structpath.GetPathStructure.GetDescriptionfromXPath(_xpath)
+      End If
+      Return _descr
+    End Get
+  End Property
+  ''' <summary>
+  ''' Gets whether or not the UNC path was a complete match with the provided Path Structure path
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property IsMatch As Boolean
+    Get
+      Return _match
+    End Get
+  End Property
+  ''' <summary>
+  ''' Gets the percentage that the UNC path matches the provided Path Structure path
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property MatchPercentage As Integer
+    Get
+      Return _conf
+    End Get
+  End Property
+  ''' <summary>
+  ''' Gets the Path Structure object's name attribute
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property PathName As String
+    Get
+      If _x.HasAttribute("name") Then
+        Return _x.Attributes("name").Value
+      Else
+        Return ""
+      End If
+    End Get
+  End Property
+
+  Public Sub New(ByVal xPath As String, ByVal refPath As PathStructureClass.Path)
+    _structpath = refPath
+    _x = _structpath.PathStructure.SelectSingleNode(xPath)
+    CheckForLinkVariables()
+    _xpath = xPath
+    _spath = _structpath.GetPathStructure.GetURIfromXPath(_x)
+    _match = Match()
+  End Sub
+  Public Sub New(ByVal xElement As XmlElement, ByVal refPath As PathStructureClass.Path)
+    _structpath = refPath
+    _x = xElement
+    CheckForLinkVariables()
+    _xpath = FindXPath(xElement)
+    _spath = _structpath.GetPathStructure.GetURIfromXPath(_x)
+    _match = Match()
+  End Sub
+
+  ''' <summary>
+  ''' Peaks for 'variablepipes' attribute(s) to dynamically adjust Path Structure Global variables starting at either the default node or the passed node variable.
+  ''' </summary>
+  ''' <param name="Node">(Optional) Used recursively, but passing a specific Path Structure node will set the starting search path.</param>
+  ''' <remarks></remarks>
+  Public Sub CheckForLinkVariables(Optional ByVal Node As XmlElement = Nothing)
+    Static blnReplaced As Boolean = False
+    If Node Is Nothing Then
+      Node = _x
+      blnReplaced = False
+      'Log(New String("v", 20))
+    End If
+    '' Check if the element is a link, and replace variables as necessary
+    If Node.HasAttribute("variablepipes") Then
+      '' Split all variable pipes
+      Dim repVars As String() = Node.Attributes("variablepipes").Value.Split({"|"}, System.StringSplitOptions.RemoveEmptyEntries)
+      If repVars.Length > 0 Then
+        For i = 0 To repVars.Length - 1 Step 1
+          '' Split name from value index
+          Dim tmp As String() = repVars(i).Split({"="}, System.StringSplitOptions.RemoveEmptyEntries)
+          If tmp.Length > 0 Then
+            '' Set the variable's value index
+            _structpath.Variables(tmp(0)).Index = Convert.ToInt32(tmp(1))
+            blnReplaced = True
+            'Log(vbTab & "Setting '" & tmp(0) & "'='" & tmp(1) & "'" & vbTab & "<" & Node.Name & " name='" & Node.Attributes("name").Value & "' />")
+          End If
+        Next
+      End If
+    End If
+    If Not Node.ParentNode.Name = "Structure" Then
+      CheckForLinkVariables(Node.ParentNode)
+    Else
+      If Not blnReplaced Then
+        'Log(New String("^", 20))
+        _structpath.Variables.Initialize()
+      End If
+    End If
+  End Sub
+
+  ''' <summary>
+  ''' Gets whether or not the current UNC path completely matches the provided Path Structure path.
+  ''' </summary>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Private Function Match() As Boolean
+    _conf = -1
+    Dim msg As New StringBuilder
+    Dim strTemp As String = _structpath.UNCPath
+    '' Fix if a file
+    If strTemp.LastIndexOf(".") > strTemp.LastIndexOf("\") Then strTemp = strTemp.Remove(strTemp.LastIndexOf("."))
+
+    '' Iterate through each character and compare. Watch out for variables and peek into _path for next character
+    Dim s As String() = _structpath.Variables.Replace(_spath).Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries) '_pstruct.ReplaceVariables(_spath, _path).Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
+    Dim f As String() = strTemp.Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
+    Dim si As Integer
+    msg.AppendLine("Comparing '" & SurroundJoin(s, "[", "]") & "'(" & s.Length.ToString & ") to '" & SurroundJoin(f, "[", "]") & "'(" & f.Length.ToString & ") from path '" & _structpath.UNCPath & "'")
+    msg.AppendLine("XPath: " & _xpath)
+    If s.Length = f.Length Then
+      For i = 0 To s.Length - 1 Step 1
+        msg.AppendLine(vbTab & "(" & i.ToString & ")'" & s(i) & "' = '" & f(i) & "'")
+        If i < f.Length Then
+          If s(i).IndexOf("{") >= 0 And s(i).IndexOf("}") >= 0 Then
+            '' Iterate through each character and compare. Watch out for variables and peek into _path for next character
+            si = 0
+            For j = 0 To f(i).Length - 1 Step 1
+              If String.Equals(s(i)(si), "{") Then
+                Do Until String.Equals(s(i)(si), "}") Or si = (s(i).Length - 1) '' Try to skip to the end of the variable
+                  si += 1
+                Loop
+                If Not si = (s(i).Length - 1) Then si += 1 '' Move index just past the end of the variable
+                Do Until String.Equals(f(i)(j), s(i)(si), StringComparison.OrdinalIgnoreCase) Or (j = f(i).Length - 1) '' Try to get to the next matching character or end of string
+                  j += 1
+                Loop
+              End If
+              msg.AppendLine("'" & s(i)(si) & "'(" & si.ToString & "/" & (s(i).Length - 1).ToString & ") = '" & f(i)(j) & "'(" & j.ToString & "/" & (f(i).Length - 1).ToString & ")")
+              '' If the last string is '}' then it doesn't matter, continue without error
+              If (si = (s(i).Length - 1)) And String.Equals(s(i)(si), "}") Then
+                Continue For
+              End If
+              '' Now check if the current character is equal at all. If not, then setup confidence score. Skip if both indices are at end
+              'If Not (j = (f(i).Length - 1)) And (si = (s(i).Length - 1)) Then
+              If Not String.Equals(s(i)(si), f(i)(j), StringComparison.OrdinalIgnoreCase) Then
+                _conf = (((i / (s.Length)) * 100) + ((j / (f(i).Length)) * 10)) '' Confidence score 1's
+                Exit For
+              Else
+                If Not (si = (s(i).Length - 1)) Then
+                  si += 1 '' Increment the structure index
+                End If
+              End If
+              'End If
+            Next
+            If Not si = (s(i).Length - 1) Then '' Check if the standard was incomplete, meaning that the object path didn't have the next required character
+              _conf = (i / (s.Length)) * 100 '' Confidence score 10's
+            End If
+            If _conf > -1 Then '' If the confidence has changed, exit the loop as it has failed
+              Exit For
+            End If
+          ElseIf Not String.Equals(s(i), f(i), StringComparison.OrdinalIgnoreCase) Then '' Full comparison check
+            _conf = (i / (s.Length)) * 100 '' Confidence score 10's
+            Exit For
+          End If
+        End If
+      Next
+    Else
+      msg.AppendLine("_spath = " & _spath)
+      _conf = 0 '' Ensure positive
+    End If
+    msg.AppendLine(vbTab & "Match percentage: " & _conf.ToString)
+    'Log(msg.ToString)
+    'Debug.WriteLine(msg.ToString)
+    If _conf = -1 Then
+      _conf = 100
+      Return True
+    Else
+      Return False
+    End If
+  End Function
+
+  ''' <summary>
+  ''' Gets a list of successful StructureCandidates (real files) related to the current StructureCandidate
+  ''' </summary>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public Function GetStructuredChildrenFiles() As List(Of StructureCandidate)
+    Dim lst As New List(Of StructureCandidate)
+    If _structpath.Type = Path.PathType.Folder Then
+      If Me.IsMatch Then
+        If Not IsNothing(_structpath.Children) Then
+          For i = 0 To _structpath.Children.Length - 1 Step 1
+            If _structpath.Children(i).IsNameStructured() Then
+              Dim nwc As StructureCandidate = _structpath.Children(i).StructureCandidates.GetHighestMatch()
+              If _structpath.Children(i).Type = Path.PathType.File Then
+                lst.Add(nwc)
+              ElseIf _structpath.Children(i).Type = Path.PathType.Folder Then
+                lst.AddRange(nwc.GetStructuredChildrenFiles().ToArray)
+              End If
+            End If
+          Next
+        End If
+      End If
+    End If
+    Return lst
+  End Function
+End Class
 
 ''' <summary>
 ''' An object that utilizes the connection string to a database in order to determine which .NET objects to use.
@@ -1996,5 +2382,260 @@ Public Class DatabaseConnection
       End If
       Return ""
     End Function
+  End Class
+End Class
+
+Public Class Users
+  Private _usrs As List(Of User)
+  Private _node As XmlElement
+
+  Public Property Users As List(Of User)
+    Get
+      Return _usrs
+    End Get
+    Set(value As List(Of User))
+      _usrs = value
+    End Set
+  End Property
+
+  Public Sub New(ByVal Node As XmlElement)
+    If Node IsNot Nothing Then
+      _node = Node
+      Dim lst As XmlNodeList = _node.ChildNodes '.SelectNodes(".//User")
+      _usrs = New List(Of User)
+      If lst.Count > 0 Then
+        For i = 0 To lst.Count - 1 Step 1
+          _usrs.Add(New User(lst(i)))
+        Next
+      End If
+    End If
+  End Sub
+
+  Public Sub SetPermissionsByGroup(ByVal Path As String, ByVal GroupName As String)
+    If _usrs.Count > 0 Then
+      For i = 0 To _usrs.Count - 1 Step 1
+        If _usrs(i).PermissionGroups.Count > 0 Then
+          For j = 0 To _usrs(i).PermissionGroups.Count - 1 Step 1
+            If String.Equals(_usrs(i).PermissionGroups(j).GroupName, GroupName, StringComparison.OrdinalIgnoreCase) Then
+              If _usrs(i).PermissionGroups(j).Permissions.Count > 0 Then
+                For k = 0 To _usrs(i).PermissionGroups(j).Permissions.Count - 1 Step 1
+                  If Not IsNothing(_usrs(i).PermissionGroups(j).Permissions(k).Rights) And Not IsNothing(_usrs(i).PermissionGroups(j).Permissions(k).Access) Then
+                    If _usrs(i).PermissionGroups(j).Permissions(k).Rights > 0 And _usrs(i).PermissionGroups(j).Permissions(k).Access >= 0 Then
+                      AddDirectorySecurity(Path, _usrs(i).UserName, _usrs(i).PermissionGroups(j).Permissions(k).Rights, _usrs(i).PermissionGroups(j).Permissions(k).Access)
+
+                      '' If allowed, check if this path has a preferred icon and create the desktop.ini file
+                      If _usrs(i).PermissionGroups(j).XElement.HasAttribute("icon") Then
+                        Dim desktopINI As String = IO.Path.Combine({Path, "desktop.ini"})
+                        If Not IO.File.Exists(desktopINI) Then
+                          Dim iconIndex, iconTip As String
+                          If _usrs(i).PermissionGroups(j).XElement.HasAttribute("iconindex") Then
+                            iconIndex = _usrs(i).PermissionGroups(j).XElement.Attributes("iconindex").Value
+                          Else
+                            iconIndex = "0"
+                          End If
+                          If _usrs(i).PermissionGroups(j).XElement.HasAttribute("icontip") Then
+                            iconTip = _usrs(i).PermissionGroups(j).XElement.Attributes("icontip").Value
+                          ElseIf _usrs(i).PermissionGroups(j).XElement.HasAttribute("description") Then
+                            iconTip = _usrs(i).PermissionGroups(j).XElement.Attributes("description").Value
+                          End If
+                          IO.File.WriteAllText(desktopINI, "[.ShellClassInfo]" & vbCrLf & _
+                                               "ConfirmFileOp=0" & vbCrLf & _
+                                               "IconFile=" & _usrs(i).PermissionGroups(j).XElement.Attributes("icon").Value & vbCrLf & _
+                                               "IconIndex=" & iconIndex & vbCrLf & _
+                                               "InfoTip=" & iconTip,
+                                               System.Text.Encoding.Unicode)
+                          SetAttr(Path, FileAttribute.System Or FileAttribute.Hidden)
+                        End If
+                      Else
+                        Log("<" & _usrs(i).PermissionGroups(j).XElement.Name & " /> didn't contain the attribute 'icon'")
+                      End If
+                    Else
+                      Log(vbTab & "Couldn't set permission: " & _usrs(i).PermissionGroups(j).Permissions(k).Rights.ToString & "=" & _usrs(i).PermissionGroups(j).Permissions(k).Access.ToString)
+                    End If
+                  Else
+                    Log("Rights or Access Control is nothing")
+                  End If
+                Next
+              Else
+                'Log("No permissions in permissions list for user '" & _usrs(i).UserName & "' and permission group '" & _usrs(i).PermissionGroups(j).GroupName & "'")
+              End If
+            End If
+          Next
+        Else
+          'Log("No permission groups in permission groups list for user '" & _usrs(i).UserName & "'")
+        End If
+      Next
+    Else
+      'Log("No users in users list")
+    End If
+  End Sub
+
+  Public Class User
+    Private _name As String
+    Private _perm As List(Of PermissionsGroup)
+    Private _node As XmlElement
+
+    Public ReadOnly Property UserName As String
+      Get
+        Return _name
+      End Get
+    End Property
+    Public Property PermissionGroups As List(Of PermissionsGroup)
+      Get
+        Return _perm
+      End Get
+      Set(value As List(Of PermissionsGroup))
+        _perm = value
+      End Set
+    End Property
+
+    Public Sub New(ByVal Node As XmlElement)
+      If Node IsNot Nothing Then
+        _node = Node
+        _name = _node.Attributes("name").Value
+        Dim lst As XmlNodeList = _node.ChildNodes '.SelectNodes(".//Permissions")
+        _perm = New List(Of PermissionsGroup)
+        If lst.Count > 0 Then
+          For i = 0 To lst.Count - 1 Step 1
+            _perm.Add(New PermissionsGroup(lst(i)))
+          Next
+        End If
+      End If
+    End Sub
+
+    Public Class PermissionsGroup
+      Private _grp As String
+      Private _perms As List(Of Permission)
+      Private _node As XmlElement
+
+      Public ReadOnly Property GroupName As String
+        Get
+          Return _grp
+        End Get
+      End Property
+      Public Property Permissions As List(Of Permission)
+        Get
+          Return _perms
+        End Get
+        Set(value As List(Of Permission))
+          _perms = value
+        End Set
+      End Property
+      Public Property XElement As XmlElement
+        Get
+          Return _node
+        End Get
+        Set(value As XmlElement)
+          _node = value
+        End Set
+      End Property
+
+      Public Sub New(ByVal Node As XmlElement)
+        If Node IsNot Nothing Then
+          _node = Node
+          _grp = _node.Attributes("group").Value
+          Dim lst As XmlNodeList = _node.ChildNodes '.SelectNodes(".//*[text()]")
+          _perms = New List(Of Permission)
+          If lst.Count > 0 Then
+            For i = 0 To lst.Count - 1 Step 1
+              If Not String.IsNullOrEmpty(lst(i).InnerText) Then
+                _perms.Add(New Permission(lst(i)))
+              End If
+            Next
+          End If
+        End If
+      End Sub
+
+      Public Class Permission
+        Private _node As XmlElement
+        Private _fsr As System.Security.AccessControl.FileSystemRights
+        Private _acc As System.Security.AccessControl.AccessControlType
+
+        Public Property Rights As FileSystemRights
+          Get
+            Return _fsr
+          End Get
+          Set(value As FileSystemRights)
+            _fsr = value
+          End Set
+        End Property
+        Public Property Access As AccessControlType
+          Get
+            Return _acc
+          End Get
+          Set(value As AccessControlType)
+            _acc = value
+          End Set
+        End Property
+        Public Property XElement As XmlElement
+          Get
+            Return _node
+          End Get
+          Set(value As XmlElement)
+            _node = value
+          End Set
+        End Property
+
+        Public Sub New(ByVal Node As XmlElement)
+          _node = Node
+          Select Case _node.Name
+            Case "AppendData"
+              _fsr = FileSystemRights.AppendData
+            Case "ChangePermissions"
+              _fsr = FileSystemRights.ChangePermissions
+            Case "CreateDirectories"
+              _fsr = FileSystemRights.CreateDirectories
+            Case "CreateFiles"
+              _fsr = FileSystemRights.CreateFiles
+            Case "Delete"
+              _fsr = FileSystemRights.Delete
+            Case "DeleteSubdirectoriesAndFiles"
+              _fsr = FileSystemRights.DeleteSubdirectoriesAndFiles
+            Case "ExecuteFile"
+              _fsr = FileSystemRights.ExecuteFile
+            Case "FullControl"
+              _fsr = FileSystemRights.FullControl
+            Case "ListDirectory"
+              _fsr = FileSystemRights.ListDirectory
+            Case "Modify"
+              _fsr = FileSystemRights.Modify
+            Case "Read"
+              _fsr = FileSystemRights.Read
+            Case "ReadAndExecute"
+              _fsr = FileSystemRights.ReadAndExecute
+            Case "ReadAttributes"
+              _fsr = FileSystemRights.ReadAttributes
+            Case "ReadData"
+              _fsr = FileSystemRights.ReadData
+            Case "ReadExtendedAttributes"
+              _fsr = FileSystemRights.ReadExtendedAttributes
+            Case "ReadPermissions"
+              _fsr = FileSystemRights.ReadPermissions
+            Case "TakeOwnership"
+              _fsr = FileSystemRights.TakeOwnership
+            Case "Traverse"
+              _fsr = FileSystemRights.Traverse
+            Case "Write"
+              _fsr = FileSystemRights.Write
+            Case "WriteAttributes"
+              _fsr = FileSystemRights.WriteAttributes
+            Case "WriteData"
+              _fsr = FileSystemRights.WriteData
+            Case "WriteExtendedAttributes"
+              _fsr = FileSystemRights.WriteExtendedAttributes
+            Case Else
+              _fsr = -1
+          End Select
+
+          If String.Equals(_node.InnerText.Trim(), "Allow", StringComparison.OrdinalIgnoreCase) Then
+            _acc = AccessControlType.Allow
+          ElseIf String.Equals(_node.InnerText.Trim(), "Deny", StringComparison.OrdinalIgnoreCase) Then
+            _acc = AccessControlType.Deny
+          Else
+            _acc = -1
+          End If
+        End Sub
+      End Class
+    End Class
   End Class
 End Class
