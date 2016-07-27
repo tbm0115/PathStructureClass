@@ -237,9 +237,9 @@ Public Module PathStructure_Helpers
     End If
   End Function
 
-  Public Event PathStructureLog(ByVal sender As Object, ByVal e As System.EventArgs)
+  Public Event PathStructureLog(ByVal sender As Object, ByVal e As System.String)
   Public Sub Log(ByVal input As String)
-    RaiseEvent PathStructureLog(input, Nothing)
+    RaiseEvent PathStructureLog(Nothing, input)
     'IO.File.AppendAllText(My.Computer.FileSystem.SpecialDirectories.MyDocuments.ToString & "\Path Structure Log.txt", input & vbLf)
   End Sub
 
@@ -283,4 +283,5 @@ Public Module PathStructure_Helpers
     Loop
     Return lst.ToArray
   End Function
+
 End Module

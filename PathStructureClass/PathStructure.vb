@@ -1,6 +1,8 @@
 ﻿Imports System.Xml, System.IO, System.Security.AccessControl, System.Text
 Imports HTML, HTML.HTMLWriter, HTML.HTMLWriter.HTMLTable
 Imports System.Data, System.Data.OleDb, System.Data.Sql, System.Data.SqlClient
+Imports DSOFile
+
 Public Class PathStructure
   Private _ERPCheck As Boolean = False
   Private _myXML As XmlDocument
@@ -10,6 +12,7 @@ Public Class PathStructure
   Private _setPermissions As Boolean = False
   Private _ERPConnection As String
   Public defaultPaths As New List(Of String)
+  Private _structs As List(Of StructureStyle)
   Public ERPConnection As DatabaseConnection ' New DatabaseConnection(My.Settings.ERPConnection)
   Private _xmlPath As String
 
@@ -81,7 +84,6 @@ Public Class PathStructure
     End Set
   End Property
 
-
   Public Sub New(ByVal SettingsDocument As String,
                  Optional ByVal ERPConnectionString As String = "",
                  Optional ByVal ERPCheck As Boolean = False,
@@ -123,8 +125,10 @@ Public Class PathStructure
       End If
       _myXML.Save(_xmlPath)
 
+      _structs = New List(Of StructureStyle)
       For Each struct As XmlElement In _myXML.SelectNodes("//Structure")
         defaultPaths.Add(struct.Attributes("defaultPath").Value)
+        _structs.Add(New StructureStyle(Me, struct))
       Next
     End If
 
@@ -263,328 +267,333 @@ Public Class PathStructure
     End If
     Return ""
   End Function
-End Class
-Public Class Extensions
-  Private _pathStruct As PathStructure
-  Private _namedStruct As XmlElement
-  Private _exts As List(Of Extension)
 
-  Default Public ReadOnly Property Item(ByVal Index As Integer)
-    Get
-      If _exts.Count > Index Then
-        Return _exts(Index)
-      Else
-        Return Nothing
+  Public Function FindStructureStyle(ByVal UNCPath As String) As StructureStyle
+    For i = 0 To _structs.Count - 1 Step 1
+      If UNCPath.IndexOf(_structs(i).DefaultPath, System.StringComparison.OrdinalIgnoreCase) >= 0 Then
+        Return _structs(i)
       End If
-    End Get
-  End Property
-  'Default Public ReadOnly Property Item(ByVal Ext As Extension)
-  '  Get
-  '    If _exts.Count > 0 Then
-  '      Return _exts(_exts.IndexOf(Ext))
-  '    Else
-  '      Return Nothing
-  '    End If
-  '  End Get
-  'End Property
-  'Default Public ReadOnly Property Item(ByVal Name As String)
-  '  Get
-  '    FormatExtension(Name)
-  '    If _exts.Count > 0 Then
-  '      Return _exts(IndexOf(Name))
-  '    Else
-  '      Return Nothing
-  '    End If
-  '  End Get
-  'End Property
+    Next
+    Return Nothing
+  End Function
 
-  Public ReadOnly Property ExtensionList As List(Of Extension)
-    Get
-      Return _exts
-    End Get
-  End Property
+  Public Class StructureStyle
+    Private _struct As PathStructure
+    Private _x As XmlElement
+    Private _chld As List(Of PathStyle)
 
-  Public Sub New(ByVal PathStruct As PathStructure, ByVal NamedStructure As XmlElement)
-    _pathStruct = PathStruct
-    _namedStruct = NamedStructure
-    _exts = New List(Of Extension)
-
-    If _namedStruct IsNot Nothing Then
-      If _namedStruct.HasAttribute("exts") Then
-        Dim strTemp As String = _namedStruct.Attributes("exts").Value
-        Dim kyval As String()
-        If strTemp.IndexOf("|") >= 0 Then
-          Dim exts As String() = strTemp.Split({"|"}, System.StringSplitOptions.RemoveEmptyEntries)
-          For i = 0 To exts.Length - 1 Step 1
-            If exts(i).IndexOf(":") >= 0 Then
-              kyval = exts(i).Split({":"}, System.StringSplitOptions.RemoveEmptyEntries)
-              If kyval.Length = 2 Then
-                Dim ext As New Extension(_pathStruct.Settings.SelectSingleNode("//Extension[@name='" & kyval(0) & "']"))
-                ext.Occurance = Convert.ToInt32(kyval(1))
-                _exts.Add(ext)
-              End If
-            End If
-          Next
+    Public Property Name As String
+      Get
+        If _x.HasAttribute("name") Then
+          Return _x.Attributes("name").Value
         Else
-          If strTemp.IndexOf(":") >= 0 Then
-            kyval = strTemp.Split({":"}, System.StringSplitOptions.RemoveEmptyEntries)
-            If kyval.Length = 2 Then
-              Dim ext As New Extension(_pathStruct.Settings.SelectSingleNode("//Extension[@name='" & kyval(0) & "']"))
-              ext.Occurance = Convert.ToInt32(kyval(1))
-              _exts.Add(ext)
-            End If
+          Return ""
+        End If
+      End Get
+      Set(value As String)
+        If Not _x.HasAttribute("name") Then
+          Dim _attr As XmlAttribute = _struct.Settings.CreateAttribute("name")
+          _x.Attributes.Append(_attr)
+        End If
+        _x.Attributes("name").Value = value
+      End Set
+    End Property
+    Public Property DefaultPath As String
+      Get
+        If _x.HasAttribute("defaultPath") Then
+          Return _x.Attributes("defaultPath").Value
+        Else
+          Return ""
+        End If
+      End Get
+      Set(value As String)
+        If Not _x.HasAttribute("defaultPath") Then
+          Dim _attr As XmlAttribute = _struct.Settings.CreateAttribute("defaultPath")
+          _x.Attributes.Append(_attr)
+        End If
+        _x.Attributes("defaultPath").Value = value
+      End Set
+    End Property
+    Public ReadOnly Property Children As PathStyle()
+      Get
+        If _chld Is Nothing Then
+          _chld = New List(Of PathStyle)
+          Dim nds As XmlNodeList = _x.ChildNodes
+          For i = 0 To nds.Count - 1 Step 1
+            _chld.Add(New PathStyle(_struct, nds(i)))
+          Next
+        End If
+        Return _chld.ToArray
+      End Get
+    End Property
+    Public ReadOnly Property XElement As XmlElement
+      Get
+        Return _x
+      End Get
+    End Property
+
+    Public Sub New(ByVal PathStruct As PathStructure, ByVal Node As XmlElement)
+      _struct = PathStruct
+      _x = Node
+    End Sub
+
+    Public Function GetStyle(ByVal XPath As String) As PathStyle
+      Dim pth As PathStyle
+      For i = 0 To _chld.Count - 1 Step 1
+        pth = RecursiveGetStyle(XPath, _chld(i))
+        If pth IsNot Nothing Then Exit For
+      Next
+      If pth Is Nothing Then
+        Dim nds As XmlNodeList = _x.SelectNodes(XPath)
+        If nds IsNot Nothing Then
+          If nds.Count = 1 Then
+            pth = New PathStyle(_struct, nds(0))
           End If
         End If
       End If
-    End If
-
-    'Log("Extensions: " & _exts.Count.ToString & vbLf & vbTab & _namedStruct.OuterXml)
-  End Sub
-
-  Public Function GetHighestMatch() As Extension
-    Dim ext As Extension
-    Dim rating As Integer = -1
-    For i = 0 To _exts.Count - 1 Step 1
-      If _exts(i).Occurance > rating Then
-        ext = _exts(i)
-        rating = ext.Occurance
-      End If
-    Next
-    Return ext
-  End Function
-
-  Public Sub SetDefaultExtension(Optional ByVal Ext As Extension = Nothing)
-    If Ext Is Nothing Then
-      Ext = GetHighestMatch()
-    End If
-    If Ext IsNot Nothing Then
-      Dim x As XmlElement = _pathStruct.Settings.SelectSingleNode(FindXPath(_namedStruct))
-      If x IsNot Nothing Then
-        If x.HasAttribute("defext") Then
-          x.Attributes("defext").Value = Ext.Name
-        Else
-          Dim attr As XmlAttribute = _pathStruct.Settings.CreateAttribute("defext")
-          attr.Value = Ext.Name
-          x.Attributes.Append(attr)
-        End If
-      End If
-      _pathStruct.Settings.Save(_pathStruct.SettingsPath)
-    End If
-  End Sub
-  Public Sub SetExtensions()
-    If _exts.Count > 0 Then
-      Dim x As XmlElement = _pathStruct.Settings.SelectSingleNode(FindXPath(_namedStruct))
-      If x IsNot Nothing Then
-        Dim attr As XmlAttribute
-        If x.HasAttribute("exts") Then
-          attr = x.Attributes("exts")
-        Else
-          attr = _pathStruct.Settings.CreateAttribute("exts")
-        End If
-        Dim extlst As New List(Of String)
-        For i = 0 To _exts.Count - 1 Step 1
-          If Not String.IsNullOrEmpty(_exts(i).Name) Then
-            extlst.Add(_exts(i).Name & ":" & _exts(i).Occurance.ToString)
+      Return pth
+    End Function
+    Private Function RecursiveGetStyle(ByVal XPath As String, ByVal Item As PathStyle) As PathStyle
+      If Item.Children.Length > 0 Then
+        For i = 0 To Item.Children.Length - 1 Step 1
+          If String.Equals(Item.Children(i).XPath, XPath, StringComparison.OrdinalIgnoreCase) Then
+            Return Item.Children(i)
+          Else
+            Return RecursiveGetStyle(XPath, Item.Children(i))
           End If
         Next
-        attr.Value = String.Join("|", extlst.ToArray)
-        If Not String.IsNullOrEmpty(attr.Value) Then
-          'Log("PathStructure_Extensions: 'exts' = " & attr.Value)
-          If x.HasAttribute("exts") Then
-            x.Attributes("exts").Value = attr.Value
-          Else
-            x.Attributes.Append(attr)
-          End If
-        Else
-          'Log("PathStructure_Extensions: 'exts' attribute would have been empty, so avoided adding attribute")
-        End If
       End If
-    End If
-    Try
-      _pathStruct.Settings.Save(_pathStruct.SettingsPath)
-    Catch ex As Exception
-      Log("Couldn't save the settings file due to process error: " & ex.Message)
-    End Try
-  End Sub
-
-  ''' <summary>
-  ''' 
-  ''' </summary>
-  ''' <param name="Name"></param>
-  ''' <remarks></remarks>
-  Public Sub AddExtension(ByVal Name As String)
-    If Not String.IsNullOrEmpty(FormatExtension(Name)) Then
-      Dim ext As XmlElement
-
-      '' Check if Settings contains Extension node
-      Dim exts As XmlNodeList = _pathStruct.Settings.SelectNodes("//Extension[@name='" & Name & "']")
-      Dim attr As XmlAttribute
-      If exts.Count = 0 Then
-        '' Create the extension
-        ext = _pathStruct.Settings.CreateElement("Extension")
-        attr = _pathStruct.Settings.CreateAttribute("name")
-        attr.Value = Name
-        ext.Attributes.Append(attr)
-        attr = _pathStruct.Settings.CreateAttribute("description")
-        attr.Value = "{New Extension}"
-        ext.Attributes.Append(attr)
-        ext = _pathStruct.Settings.SelectSingleNode("//Extensions").AppendChild(ext)
-        _pathStruct.Settings.Save(_pathStruct.SettingsPath)
-      ElseIf exts.Count > 1 Then
-        'Log("PathStructure_Extensions: There shouldn't be more than one extension in the Settings file.")
-      ElseIf exts.Count = 1 Then
-        ext = exts(0)
-      Else
-        'Log("PathStructure_Extensions: exts.Count is less than 0?")
-      End If
-
-      If Not Contains(Name) Then
-        If ext IsNot Nothing Then
-          Dim nwExt As New Extension(ext)
-          nwExt.Occurance = 1
-          _exts.Add(nwExt)
-          'Log("PathStructure_Extensions: Adding '" & Name & "' to extension list")
-        Else
-          'Log("PathStructure_Extensions: Couldn't add '" & Name & "' to extension list because the Extension node could not be found")
-        End If
-      Else
-        _exts.Item(IndexOf(Name)).Occurance += 1
-        'Log("PathStructure_Extensions: Trying to increase the count of extension '" & Name & "' to " & _exts.Item(IndexOf(Name)).Occurance.ToString)
-      End If
-
-      SetExtensions()
-    End If
-  End Sub
-
-  Private Function FormatExtension(ByRef Name As String) As String
-    If Name.IndexOf(".") = 0 Then
-      Name = Name.Remove(0, 1)
-    End If
-    Name = Name.ToUpper
-    Return Name
-  End Function
-
-  Public Overloads Function Contains(ByVal Name As String) As Boolean
-    FormatExtension(Name)
-    For i = 0 To _exts.Count - 1 Step 1
-      If String.Equals(_exts(i).Name, Name, StringComparison.OrdinalIgnoreCase) Then
-        Return True
-      End If
-    Next
-    Return False
-  End Function
-  Public Overloads Function Contains(ByVal Ext As Extension) As Boolean
-    Return _exts.Contains(Ext)
-  End Function
-
-  Public Overloads Function IndexOf(ByVal Ext As Extension) As Integer
-    For i = 0 To _exts.Count - 1 Step 1
-      If _exts(i).Equals(Ext) Then
-        Return i
-      End If
-    Next
-    Return -1
-  End Function
-  Public Overloads Function IndexOf(ByVal Name As String) As Integer
-    FormatExtension(Name)
-    For i = 0 To _exts.Count - 1 Step 1
-      If _exts(i).Name.Equals(Name, StringComparison.OrdinalIgnoreCase) Then
-        Return i
-      End If
-    Next
-    Return -1
-  End Function
-
-  Public Class Extension
+      Return Nothing
+    End Function
+  End Class
+  Public Class PathStyle
+    Private _struct As PathStructure
     Private _x As XmlElement
-    Private _cnt As Integer = 1
+    Private _xpath, _uri As String
+    Private _type As PathStyleType
+    Private _parent As PathStyle
+    Private _chld As List(Of PathStyle)
 
     Public ReadOnly Property XElement As XmlElement
       Get
         Return _x
       End Get
     End Property
-    Public ReadOnly Property Name As String
+    Public Property Name As String
       Get
-        If _x IsNot Nothing Then
-          If _x.HasAttribute("name") Then
-            Return _x.Attributes("name").Value
-          End If
+        If _x.HasAttribute("name") Then
+          Return _x.Attributes("name").Value
+        Else
+          Return ""
         End If
-        Return ""
       End Get
-    End Property
-    Public ReadOnly Property Description As String
-      Get
-        If _x IsNot Nothing Then
-          If _x.HasAttribute("description") Then
-            Return _x.Attributes("description").Value
-          End If
+      Set(value As String)
+        If Not _x.HasAttribute("name") Then
+          Dim _attr As XmlAttribute = _struct.Settings.CreateAttribute("name")
+          _x.Attributes.Append(_attr)
         End If
-        Return ""
-      End Get
-    End Property
-    Public Property Occurance As Integer
-      Get
-        Return _cnt
-      End Get
-      Set(value As Integer)
-        _cnt = value
+        _x.Attributes("name").Value = value
+
+        '' Reset fragile properties
+        _xpath = Nothing
+        _uri = Nothing
       End Set
     End Property
+    Public Property Description As String
+      Get
+        If _x.HasAttribute("description") Then
+          Return _x.Attributes("description").Value
+        Else
+          Return ""
+        End If
+      End Get
+      Set(value As String)
+        If Not _x.HasAttribute("description") Then
+          Dim _attr As XmlAttribute = _struct.Settings.CreateAttribute("description")
+          _x.Attributes.Append(_attr)
+        End If
+        _x.Attributes("description").Value = value
 
-    Public Overrides Function ToString() As String
-      Return Name
-    End Function
-    Public Overrides Function Equals(obj As Object) As Boolean
-      Dim typ As Type = obj.GetType
-      If typ.GetProperty("Name") IsNot Nothing Then
-        Return String.Equals(Me.Name, obj.Name)
-      Else
+        '' Reset fragile properties
+        _xpath = Nothing
+        _uri = Nothing
+      End Set
+    End Property
+    Public Property IsFreeForm As Boolean
+      Get
+        If _x.HasAttribute("freeform") Then
+          Return Convert.ToBoolean(_x.Attributes("freeform").Value)
+        Else
+          Return False
+        End If
+      End Get
+      Set(value As Boolean)
+        If Not _x.HasAttribute("freeform") Then
+          Dim _attr As XmlAttribute = _struct.Settings.CreateAttribute("freeform")
+          _x.Attributes.Append(_attr)
+        End If
+        _x.Attributes("freeform").Value = value.ToString
+      End Set
+    End Property
+    Public ReadOnly Property HasIcon As Boolean
+      Get
+        If _type = PathStyleType.FolderStyle Then
+          If _x.HasAttribute("icon") And _x.HasAttribute("iconindex") Then
+            Return True
+          End If
+        End If
         Return False
-      End If
-    End Function
-    Public Overloads Shared Operator =(ByVal cObject As Extension, ByVal aObject As Object)
-      Return cObject.Equals(aObject)
-    End Operator
-    Public Overloads Shared Operator <>(ByVal cObject As Extension, ByVal aObject As Object)
-      Return (Not cObject.Equals(aObject))
-    End Operator
+      End Get
+    End Property
+    Public ReadOnly Property HasPreview As Boolean
+      Get
+        If _type = PathStyleType.FolderStyle Then
+          If _x.HasAttribute("preview") Then
+            Return True
+          End If
+        End If
+        Return False
+      End Get
+    End Property
+    Public ReadOnly Property HasPermissionsGroup As Boolean
+      Get
+        If _type = PathStyleType.FolderStyle Then
+          If _x.HasAttribute("permissionsgroup") Then
+            Return True
+          End If
+        End If
+        Return False
+      End Get
+    End Property
+    Public ReadOnly Property XPath As String
+      Get
+        If String.IsNullOrEmpty(_xpath) Then
+          _xpath = _x.FindXPath()
+        End If
+        Return _xpath
+      End Get
+    End Property
+    Public ReadOnly Property URI As String
+      Get
+        If String.IsNullOrEmpty(_uri) Then
+          _uri = _struct.GetURIfromXPath(Me.XPath)
+        End If
+        Return _uri
+      End Get
+    End Property
 
-    Public Sub New(ByVal Element As XmlElement)
-      _x = Element
+    Public ReadOnly Property Parent As PathStyle
+      Get
+        If _parent Is Nothing Then
+          If _x.ParentNode IsNot Nothing Then
+            _parent = New PathStyle(_struct, _x.ParentNode)
+          End If
+        End If
+        Return _parent
+      End Get
+    End Property
+    Public ReadOnly Property Children As PathStyle()
+      Get
+        If _chld Is Nothing Then
+          _chld = New List(Of PathStyle)
+          Dim nds As XmlNodeList = _x.ChildNodes
+          For i = 0 To nds.Count - 1 Step 1
+            _chld.Add(New PathStyle(_struct, nds(i)))
+          Next
+        End If
+        Return _chld.ToArray
+      End Get
+    End Property
+
+    Public Enum PathStyleType
+      FolderStyle
+      FileStyle
+    End Enum
+
+    Public Sub New(ByVal PathStruct As PathStructure, ByVal Node As XmlElement)
+      _struct = PathStruct
+      _x = Node
+
+      If String.Equals(_x.Name, "Folder", StringComparison.OrdinalIgnoreCase) Then
+        _type = PathStyleType.FolderStyle
+      ElseIf String.Equals(_x.Name, "File", StringComparison.OrdinalIgnoreCase) Then
+        _type = PathStyleType.FileStyle
+      ElseIf String.Equals(_x.Name, "Option", StringComparison.OrdinalIgnoreCase) Then
+        _type = PathStyleType.FileStyle
+      End If
     End Sub
+
+    Public Function GetExtensions() As Extensions
+      Return New Extensions(_struct, _x)
+    End Function
+    Public Function GetIconFile() As String
+      If _type = PathStyleType.FileStyle Then
+        If _x.HasAttribute("icon") Then
+          Return _x.Attributes("icon").Value
+        End If
+      End If
+      Return ""
+    End Function
+    Public Function GetIconIndex() As String
+      If _type = PathStyleType.FileStyle Then
+        If _x.HasAttribute("iconindex") Then
+          Return _x.Attributes("iconindex").Value
+        End If
+      End If
+      Return ""
+    End Function
+    Public Function GetPermissionsGroup() As String
+      If _type = PathStyleType.FileStyle Then
+        If _x.HasAttribute("permissionsgroup") Then
+          Return _x.Attributes("permissionsgroup").Value
+        End If
+      End If
+      Return ""
+    End Function
   End Class
 End Class
 
+''' <summary>
+''' Represents a real Filesystem path and compares it to Path Structure
+''' </summary>
+''' <remarks></remarks>
 Public Class Path : Implements IDisposable
 
+#Region "Private Variables"
   Private _type As PathType
   Private _path As String
   Private Shared _struct As XmlElement
   Private _infoFile As IO.FileInfo
   Private _infoFolder As IO.DirectoryInfo
   Private Shared myXML As XmlDocument
-  Private _defaultPath, _startPath As String
   Private _variables As VariableArray
   Private _parent As Path
   Private _children As Path()
   Private _candidates As StructureCandidateArray
   Private Shared _pstruct As PathStructure
+  Private _structStyle As PathStructure.StructureStyle
+  Private _pathStyle As PathStructure.PathStyle
   Private _exts As Extensions
   Private _users As Users
+#End Region
 
-  Public ReadOnly Property GetPathStructure As PathStructure
+#Region "Properties"
+  ''' <summary>
+  ''' Returns the current Path's Path Structure reference.
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>PathStructure</returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property PStructure As PathStructure
     Get
       Return _pstruct
     End Get
   End Property
-
   ''' <summary>
-  ''' Gets the PathStructure representation of the current path's parent directory.
+  ''' Returns the Path of the current Path's parent directory.
   ''' </summary>
   ''' <value></value>
-  ''' <returns>PathStructure</returns>
+  ''' <returns>Path</returns>
   ''' <remarks></remarks>
   Public ReadOnly Property Parent As Path
     Get
@@ -596,6 +605,12 @@ Public Class Path : Implements IDisposable
       Return _parent
     End Get
   End Property
+  ''' <summary>
+  ''' Returns the UNC path of the current Path's parent directory
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>String</returns>
+  ''' <remarks></remarks>
   Public ReadOnly Property ParentPath As String
     Get
       Dim splt As String() = _path.Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
@@ -607,20 +622,11 @@ Public Class Path : Implements IDisposable
       End If
     End Get
   End Property
-  Public ReadOnly Property CurrentDirectory As String
-    Get
-      If _type = PathType.File Then
-        Return ParentPath
-      Else
-        Return _path
-      End If
-    End Get
-  End Property
   ''' <summary>
-  ''' Enumerates the PathStructure objects the represent the current path's child filesystem objects.
+  ''' Returns the Path objects the represent the current Path's child filesystem objects.
   ''' </summary>
   ''' <value></value>
-  ''' <returns>PathStructure()</returns>
+  ''' <returns>Path()</returns>
   ''' <remarks></remarks>
   Public ReadOnly Property Children As Path()
     Get
@@ -634,8 +640,6 @@ Public Class Path : Implements IDisposable
               Dim tmp As New Path(_pstruct, fil, PathType.File, chk)
               If chk Then
                 arr.Add(tmp)
-                'Else
-                'Log("Addition of File '" & tmp.UNCPath & "' failed during initialization")
               End If
             Next
             For Each fol As String In IO.Directory.EnumerateDirectories(_path)
@@ -643,8 +647,6 @@ Public Class Path : Implements IDisposable
               Dim tmp As New Path(_pstruct, fol, PathType.Folder, chk)
               If chk Then
                 arr.Add(tmp)
-                'Else
-                'Log("Addition of Folder '" & tmp.UNCPath & "' failed during initialization")
               End If
             Next
             _children = arr.ToArray
@@ -658,11 +660,23 @@ Public Class Path : Implements IDisposable
       End If
     End Get
   End Property
+  ''' <summary>
+  ''' Returns the IO.FileSystemInfo of a Path.PathType.File, returns nothing otherwise
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>IO.FileSystemInfo</returns>
+  ''' <remarks></remarks>
   Public ReadOnly Property FileInfo As IO.FileSystemInfo
     Get
       Return _infoFile
     End Get
   End Property
+  ''' <summary>
+  ''' Returns the IO.FileSystemInfo of a Path.PathType.Folder, returns nothing otherwise
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>IO.FileSystemInfo</returns>
+  ''' <remarks></remarks>
   Public ReadOnly Property FolderInfo As IO.FileSystemInfo
     Get
       Return _infoFolder
@@ -671,8 +685,8 @@ Public Class Path : Implements IDisposable
   ''' <summary>
   ''' Gets a list of variables in the current path and their values.
   ''' </summary>
-  ''' <value>Key is variable name. Value is the variable value.</value>
-  ''' <returns>SortedList(Of String, String)</returns>
+  ''' <value></value>
+  ''' <returns>VariableArray</returns>
   ''' <remarks></remarks>
   Public Property Variables As VariableArray
     Get
@@ -705,27 +719,11 @@ Public Class Path : Implements IDisposable
     End Get
   End Property
   ''' <summary>
-  ''' Gets the default (or root) directory for the current Structure.
+  ''' Returns the name of the current Path. For PathType.File, returns the filename. For PathType.Folder, returns the folder name.
   ''' </summary>
   ''' <value></value>
   ''' <returns>String</returns>
   ''' <remarks></remarks>
-  Public ReadOnly Property DefaultPath As String
-    Get
-      Return _defaultPath
-    End Get
-  End Property
-  ''' <summary>
-  ''' Gets the current path with replaced variables.
-  ''' </summary>
-  ''' <value></value>
-  ''' <returns>String</returns>
-  ''' <remarks></remarks>
-  Public ReadOnly Property StartPath As String
-    Get
-      Return _startPath
-    End Get
-  End Property
   Public ReadOnly Property PathName As String
     Get
       If _type = PathType.File Then
@@ -737,6 +735,12 @@ Public Class Path : Implements IDisposable
       End If
     End Get
   End Property
+  ''' <summary>
+  ''' Returns the extension of a Path of PathType.File, returns an empty string otherwise
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>String</returns>
+  ''' <remarks></remarks>
   Public ReadOnly Property Extension As String
     Get
       If _type = PathType.File Then
@@ -746,17 +750,49 @@ Public Class Path : Implements IDisposable
       End If
     End Get
   End Property
+  ''' <summary>
+  ''' Returns an Extensions object that manages a list of potential extensions for the current structured Path.
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>Extensions</returns>
+  ''' <remarks></remarks>
+  Public Property Extensions As Extensions
+    Get
+      Return _exts
+    End Get
+    Set(value As Extensions)
+      _exts = value
+    End Set
+  End Property
+  ''' <summary>
+  ''' Returns the XmlElement of the current Path's PathStructure reference in the XmlDocument settings.
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>XmlElement</returns>
+  ''' <remarks></remarks>
   Public ReadOnly Property PathStructure As XmlElement
     Get
       Return _struct
     End Get
   End Property
+  ''' <summary>
+  ''' Returns a StructureCandidateArray object that manages a list of potential PathStructure candidates for the current Path.
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>StructureCandidateArray</returns>
+  ''' <remarks>This array helps determine which parts of the PathStructure the current Path matches.</remarks>
   Public ReadOnly Property StructureCandidates As StructureCandidateArray
     Get
       If _candidates Is Nothing Then IsNameStructured()
       Return _candidates
     End Get
   End Property
+  ''' <summary>
+  ''' Returns a Users object that manages a list of User permissions in case security settings must be applied.
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>Users</returns>
+  ''' <remarks></remarks>
   Public Property Users As Users
     Get
       Return _users
@@ -765,19 +801,60 @@ Public Class Path : Implements IDisposable
       _users = value
     End Set
   End Property
+  ''' <summary>
+  ''' Returns a StructureStyle object that is set only if there is a perfect match of the current path with a default structure path.
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>PathStructure.StructureStyle</returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property StructureStyle As PathStructure.StructureStyle
+    Get
+      Return _structStyle
+    End Get
+  End Property
+  ''' <summary>
+  ''' Returns a PathStyle object that is set only if there is a perfect match of the current path with a single path structure.
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>PathStructure.PathStyle</returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property PathStyle As PathStructure.PathStyle
+    Get
+      Return _pathStyle
+    End Get
+  End Property
+#End Region
 
-
+#Region "Enumerations"
+  ''' <summary>
+  ''' Represents the FileSystem object type.
+  ''' </summary>
+  ''' <remarks></remarks>
   Public Enum PathType
     File
     Folder
   End Enum
+#End Region
 
+#Region "Overrides"
+  ''' <summary>
+  ''' Returns the UNC path of the current Path.
+  ''' </summary>
+  ''' <returns>String</returns>
+  ''' <remarks></remarks>
   Public Overrides Function ToString() As String
     Return _path
   End Function
+  ''' <summary>
+  ''' Compares the current Path's UNC path against the sender's UNC path.
+  ''' </summary>
+  ''' <param name="obj">Path or UNC path (as System.String)</param>
+  ''' <returns>Boolean</returns>
+  ''' <remarks></remarks>
   Public Overrides Function Equals(obj As Object) As Boolean
     Return String.Equals(obj.ToString, _path, StringComparison.OrdinalIgnoreCase)
   End Function
+#End Region
 
   Public Sub New(ByVal PStructure As PathStructure,
                  ByVal Path As String,
@@ -824,26 +901,32 @@ Public Class Path : Implements IDisposable
       myXML = myXML
     End If
     '' Find relevant Structure
-    Dim structs As XmlNodeList = myXML.SelectNodes("//Structure")
-    For i = 0 To structs.Count - 1 Step 1
-      If _path.IndexOf(structs(i).Attributes("defaultPath").Value, System.StringComparison.OrdinalIgnoreCase) >= 0 Then
-        _struct = structs(i)
-        Exit For
-      End If
-    Next
-    If _struct Is Nothing Then Throw New ArgumentException("PathStructure: Couldn't determine the default Structure node from '" & _path & "'. Searched " & structs.Count.ToString & " Structures in XmlDocument.")
+    _structStyle = _pstruct.FindStructureStyle(_path)
+    _struct = _structStyle.XElement
 
-    _defaultPath = _struct.Attributes("path").Value
+    'Dim structs As XmlNodeList = myXML.SelectNodes("//Structure")
+    'For i = 0 To structs.Count - 1 Step 1
+    '  If _path.IndexOf(structs(i).Attributes("defaultPath").Value, System.StringComparison.OrdinalIgnoreCase) >= 0 Then
+    '    _struct = structs(i)
+    '    Exit For
+    '  End If
+    'Next
+    'If _struct Is Nothing Then Throw New ArgumentException("PathStructure: Couldn't determine the default Structure node from '" & _path & "'. Searched " & structs.Count.ToString & " Structures in XmlDocument.")
+
+    '_defaultPath = _struct.Attributes("path").Value
     If _struct.SelectSingleNode("Users") IsNot Nothing Then
       _users = New Users(_struct.SelectSingleNode("Users"))
     End If
 
-    Dim defSeparator As Integer = CountStringOccurance(_defaultPath, IO.Path.DirectorySeparatorChar)
+    'Dim defSeparator As Integer = CountStringOccurance(_defaultPath, IO.Path.DirectorySeparatorChar)
     '' Enumerate variables
     _variables = New VariableArray(_struct.SelectSingleNode("Variables"), Me)
 
     '' Set Start path
-    _startPath = _defaultPath & "\" & Variables.Replace(_struct.Attributes("path").Value)
+    '_startPath = _defaultPath & "\" & Variables.Replace(_struct.Attributes("path").Value)
+
+    '' Compare to Path Structure
+    IsNameStructured()
   End Sub
 
   ''' <summary>
@@ -852,12 +935,13 @@ Public Class Path : Implements IDisposable
   ''' <returns>Boolean</returns>
   ''' <remarks></remarks>
   Public Function IsDescendantOfDefaultPath() As Boolean
-    If Not String.IsNullOrEmpty(_path) Then
-      If _path.IndexOf(_defaultPath, System.StringComparison.OrdinalIgnoreCase) >= 0 Then
-        Return True
-      End If
-    End If
-    Return False
+    'If Not String.IsNullOrEmpty(_path) Then
+    '  If _path.IndexOf(_defaultPath, System.StringComparison.OrdinalIgnoreCase) >= 0 Then
+    '    Return True
+    '  End If
+    'End If
+    'Return False
+    Return (_structStyle IsNot Nothing)
   End Function
 
   ''' <summary>
@@ -866,14 +950,16 @@ Public Class Path : Implements IDisposable
   ''' <returns></returns>
   ''' <remarks></remarks>
   Public Function IsNameStructured() As Boolean
+    Static blnFound As Boolean = False
+    If blnFound Then Return blnFound '' Dont run this routine more than once
+
     '' Initialize candidates
-    'Log(vbTab & vbTab & "Initializing StructureCandidateArray for IsNameStructured routine of '" & Me.UNCPath & "'")
     _candidates = New StructureCandidateArray(Me)
 
     Dim strTemp As String
     Dim searchXPath As String
-    Dim blnFound As Boolean = False
-    Dim isMatch As Boolean
+
+    '' Create XPath depending on FSO type
     If _type = PathType.File Then
       strTemp = Variables.Replace(ParentPath) ' ReplaceVariables(ParentPath, _path)
       searchXPath = ".//Folder[@name='" & Uri.EscapeDataString(strTemp) & "']/File[not(Option)]|.//Folder[@name='" & Uri.EscapeDataString(strTemp) & "']/File/Option"
@@ -883,29 +969,40 @@ Public Class Path : Implements IDisposable
       searchXPath = ".//Folder[@name='" & Uri.EscapeDataString(strTemp) & "']"
       If _struct.SelectNodes(searchXPath).Count <= 0 Then searchXPath = ".//Folder"
     End If
+
+    '' Add default path to match
+    _candidates.Add(_struct)
+
     If Not String.IsNullOrEmpty(searchXPath) Then
       Dim objs As XmlNodeList = _struct.SelectNodes(searchXPath)
-      'Log(New String(vbTab, 3) & objs.Count.ToString & " potential nodes found using '" & searchXPath & "'")
       If objs.Count > 0 Then
         _candidates.AddRange(objs) '' Add all of the matching XPaths. Each new object will run a match check.
         _candidates.GetHighestMatch().CheckForLinkVariables() '' Try to fix variables with this
-        _candidates.RemoveMismatches(100) '' Remove any mismatches
-      Else
-        'Debug.WriteLine("No nodes found for '" & searchXPath & "'")
+        _candidates.RemoveMismatches(100) '' Remove any mismatches below the threshold of a score of 100% (this excludes mismatches with extensions)
       End If
     Else
+      '' This only occurs if the type was not set to either File or Folder
       Throw New ArgumentException("Couldn't determine path type", "Invalid Path Type")
-    End If
-
-    If String.Equals(_path, _startPath, StringComparison.OrdinalIgnoreCase) Then
-      _candidates.Add(_struct)
-      blnFound = True
     End If
 
     '' Check if more than one Candidate, remove wildcards if at least one does not end in wildcard
     If _candidates.Count > 1 Or _candidates.Count = 0 Then
-      'Debug.WriteLine("Fail(" & _candidates.Count.ToString & "): " & _path & " = " & SurroundJoin(_candidates.ToArray, "[", "]"))
-      blnFound = False
+      If _candidates.Count > 1 Then
+        '' Try to remove any complete wildcard candidates to make room for non-complete wildcard candidates
+        For i = _candidates.Count - 1 To 0 Step -1
+          If String.Equals(_candidates(i).XElement.InnerText, "{}", StringComparison.OrdinalIgnoreCase) Then
+            _candidates.RemoveAt(i)
+          End If
+        Next
+        If _candidates.Count = 1 Then
+          Dim m_file As DSOFile.OleDocumentProperties
+          m_file = New DSOFile.OleDocumentProperties
+          m_file.Open(_path, True, dsoFileOpenOptions.dsoOptionDefault)
+          blnFound = True
+        End If
+      Else
+        blnFound = False
+      End If
     ElseIf _candidates.Count = 1 Then
       If _type = PathType.Folder Then
         If _pstruct.CanGenerateIcons Then
@@ -931,20 +1028,12 @@ Public Class Path : Implements IDisposable
                                    "InfoTip=" & iconTip,
                                    System.Text.Encoding.Unicode)
               SetAttr(_path, FileAttribute.System)
-              SetAttr(desktopINI, FileAttribute.Hidden)
+              SetAttr(desktopINI, FileAttribute.System Or FileAttribute.Hidden)
             End If
           End If
         End If
       End If
-      blnFound = True
-      '' Check if we're allowed to Handle Extensions now that we found the right structure
-      If _pstruct.HandleExtensions And _type = PathType.File Then
-        '' Now lets add an extension
-        If _exts Is Nothing Then
-          _exts = New Extensions(_pstruct, _candidates.GetHighestMatch().XElement)
-          _exts.AddExtension(Me.Extension)
-        End If
-      End If
+      blnFound = True '' Set to true because only one candidate was found
     End If
 
     Return blnFound
@@ -1010,6 +1099,7 @@ Public Class Path : Implements IDisposable
 
   Public Function FindNearestArchive(Optional ByVal FocusPath As Path = Nothing) As String
     If FocusPath Is Nothing Then FocusPath = Me
+    Log(vbTab & "Finding Archive: " & FocusPath.Type.ToString & vbTab & "'" & FocusPath.UNCPath & "'")
     If FocusPath.Type = PathType.Folder Then
       For i = 0 To FocusPath.Children.Length - 1 Step 1
         If FocusPath.Children(i).PathName.IndexOf("Archive", StringComparison.OrdinalIgnoreCase) >= 0 And FocusPath.Children(i).Type = PathType.Folder Then
@@ -1020,14 +1110,15 @@ Public Class Path : Implements IDisposable
     If _pstruct.IsInDefaultPath(FocusPath.Parent.UNCPath) Then
       Return FindNearestArchive(FocusPath.Parent)
     Else
-      Return Me.CurrentDirectory
+      Return Me.ParentPath
     End If
   End Function
 
   Public Sub LogData(ByVal ChangedPath As String, ByVal Method As String)
     Try
-      IO.File.AppendAllText(_defaultPath & "\PathStructure Changes.csv",
+      IO.File.AppendAllText(_structStyle.DefaultPath & "\PathStructure Changes.csv",
                             DateTime.Now.ToString("yyyy-MM-dd hh:mm:ss tt") & "," & _path & "," & ChangedPath & "," & Method & "," & My.User.Name & vbCrLf)
+      Log("{LogData} " & Method & ": " & ChangedPath)
     Catch ex As Exception
       Log("Error while appending change log:" & vbCrLf & vbTab & ex.Message)
     End Try
@@ -1464,8 +1555,8 @@ Public Class Path : Implements IDisposable
         _infoFile = Nothing
         _infoFolder = Nothing
         myXML = Nothing
-        _defaultPath = Nothing
-        _startPath = Nothing
+        '_defaultPath = Nothing
+        '_startPath = Nothing
         _variables = Nothing
         _parent = Nothing
         _children = Nothing
@@ -1482,11 +1573,11 @@ Public Class Path : Implements IDisposable
   End Sub
 
   ' TODO: override Finalize() only if Dispose(ByVal disposing As Boolean) above has code to free unmanaged resources.
-  'Protected Overrides Sub Finalize()
-  '    ' Do not change this code.  Put cleanup code in Dispose(ByVal disposing As Boolean) above.
-  '    Dispose(False)
-  '    MyBase.Finalize()
-  'End Sub
+  Protected Overrides Sub Finalize()
+    ' Do not change this code.  Put cleanup code in Dispose(ByVal disposing As Boolean) above.
+    Dispose(False)
+    MyBase.Finalize()
+  End Sub
 
   ' This code added by Visual Basic to correctly implement the disposable pattern.
   Public Sub Dispose() Implements IDisposable.Dispose
@@ -1495,7 +1586,6 @@ Public Class Path : Implements IDisposable
     GC.SuppressFinalize(Me)
   End Sub
 #End Region
-
 End Class
 
 Public Class VariableArray
@@ -1639,12 +1729,17 @@ Public Class VariableArray
     Return fnd
   End Function
 End Class
+''' <summary>
+''' Represents a Path's Path Structure variable and retains the values both globaly and through 'variablepipes'
+''' </summary>
+''' <remarks></remarks>
 Public Class Variable
   Private _x As XmlElement
   Private _name, _erptable As String
   Private _index As Integer
   Private _cmds As New List(Of ERPCommand)
   Private _refVarPath As Path
+
   Public ReadOnly Property Value As String
     Get
       Dim nodes As String() = _refVarPath.UNCPath.Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
@@ -1701,13 +1796,24 @@ Public Class Variable
     _refVarPath = Path
   End Sub
 
+  ''' <summary>
+  ''' Determines whether or not the input value contains the name of the current Variable.
+  ''' </summary>
+  ''' <param name="Input"></param>
+  ''' <returns>Boolean</returns>
+  ''' <remarks></remarks>
   Public Function HasVariable(ByVal Input As String) As Boolean
     Return (Input.IndexOf(_name) >= 0)
   End Function
 
+  ''' <summary>
+  ''' Determines whether or not the variable value is valid in the ERP system.
+  ''' </summary>
+  ''' <returns>Boolean</returns>
+  ''' <remarks></remarks>
   Public Function IsValid() As Boolean
     Dim blnFound As Boolean = False
-    If _refVarPath.GetPathStructure.CheckERPSystem Then ' My.Settings.blnERPCheck Then
+    If _refVarPath.PStructure.CheckERPSystem Then ' My.Settings.blnERPCheck Then
       Dim cond As String
       Dim selFields As String
       For i = 0 To _cmds.Count - 1 Step 1
@@ -1724,8 +1830,8 @@ Public Class Variable
       If cond.EndsWith(" AND ") Then cond = cond.Remove(cond.LastIndexOf(" AND "))
       cond = cond.Replace("{", "").Replace("}", "")
 
-      If _refVarPath.GetPathStructure.ERPConnection.Successful Then ' ERPConnection.Successful Then
-        blnFound = _refVarPath.GetPathStructure.ERPConnection.CommandHasValues("SELECT " & selFields & " FROM [" & _erptable & "] WHERE " & cond & ";") 'ERPConnection.CommandHasValues("SELECT " & selFields & " FROM [" & _erptable & "] WHERE " & cond & ";")
+      If _refVarPath.PStructure.ERPConnection.Successful Then ' ERPConnection.Successful Then
+        blnFound = _refVarPath.PStructure.ERPConnection.CommandHasValues("SELECT " & selFields & " FROM [" & _erptable & "] WHERE " & cond & ";") 'ERPConnection.CommandHasValues("SELECT " & selFields & " FROM [" & _erptable & "] WHERE " & cond & ";")
       Else
         Log("Connection to ERP system unsuccessful!")
       End If
@@ -1735,6 +1841,12 @@ Public Class Variable
     Return blnFound
   End Function
 
+  ''' <summary>
+  ''' Replaces any variable name found in the provided string with a valid value of the variable.
+  ''' </summary>
+  ''' <param name="Input">String to which variable values will replace variable names</param>
+  ''' <returns>String</returns>
+  ''' <remarks></remarks>
   Public Function Replace(ByVal Input As String) As String
     If Not String.IsNullOrEmpty(Input) Then
       If Input.IndexOf(_name, System.StringComparison.OrdinalIgnoreCase) >= 0 Then
@@ -1775,6 +1887,10 @@ Public Class Variable
   End Class
 End Class
 
+''' <summary>
+''' Represents and manages a list of StructureCanidate objects for a given Path to help determine what part of the PathStructure the path might be part of.
+''' </summary>
+''' <remarks></remarks>
 Public Class StructureCandidateArray
   Private _lst As New List(Of StructureCandidate)
   Private _structarrpath As String
@@ -1880,6 +1996,7 @@ End Class
 ''' <remarks></remarks>
 Public Class StructureCandidate
   Private _x As XmlElement
+  'Private _x As PathStructure.PathStyle
   Private _xpath, _descr, _spath As String
   Private _structpath As Path
   Private _match As Boolean
@@ -1905,6 +2022,7 @@ Public Class StructureCandidate
   Public ReadOnly Property XElement As XmlElement
     Get
       Return _x
+      'Return _x.XElement
     End Get
   End Property
   ''' <summary>
@@ -1949,7 +2067,7 @@ Public Class StructureCandidate
   Public ReadOnly Property StructureDescription As String
     Get
       If String.IsNullOrEmpty(_descr) Then
-        _descr = _structpath.GetPathStructure.GetDescriptionfromXPath(_xpath)
+        _descr = _structpath.PStructure.GetDescriptionfromXPath(_xpath)
       End If
       Return _descr
     End Get
@@ -1984,11 +2102,12 @@ Public Class StructureCandidate
   ''' <remarks></remarks>
   Public ReadOnly Property PathName As String
     Get
-      If _x.HasAttribute("name") Then
-        Return _x.Attributes("name").Value
-      Else
-        Return ""
-      End If
+      'If _x.HasAttribute("name") Then
+      '  Return _x.Attributes("name").Value
+      'Else
+      '  Return ""
+      'End If
+      Return _x.Name
     End Get
   End Property
 
@@ -1996,17 +2115,37 @@ Public Class StructureCandidate
     _structpath = refPath
     _x = _structpath.PathStructure.SelectSingleNode(xPath)
     CheckForLinkVariables()
+    '_x = refPath.StructureStyle.GetStyle(xPath)
     _xpath = xPath
-    _spath = _structpath.GetPathStructure.GetURIfromXPath(_x)
-    _match = Match()
+    _spath = _structpath.PStructure.GetURIfromXPath(_x)
+    '_spath = _x.URI
+    _match = Match() '' Process the Path Structure
+    If _match And refPath.Type = Path.PathType.File Then '' If a match, then check extensions
+      refPath.Extensions = New Extensions(refPath.PStructure, _x)
+      'refPath.Extensions = _x.GetExtensions()
+      If Not refPath.Extensions.Contains(refPath.Extension) Then
+        _match = False
+        _conf -= 1
+      End If
+    End If
   End Sub
   Public Sub New(ByVal xElement As XmlElement, ByVal refPath As PathStructureClass.Path)
     _structpath = refPath
     _x = xElement
     CheckForLinkVariables()
-    _xpath = FindXPath(xElement)
-    _spath = _structpath.GetPathStructure.GetURIfromXPath(_x)
-    _match = Match()
+    '_x = refPath.StructureStyle.GetStyle(xElement.FindXPath())
+    _xpath = xElement.FindXPath()
+    _spath = _structpath.PStructure.GetURIfromXPath(_x)
+    '_spath = _x.URI
+    _match = Match() '' Process the Path Structure
+    If _match And refPath.Type = Path.PathType.File Then '' If a match, then check extensions
+      refPath.Extensions = New Extensions(refPath.PStructure, _x)
+      'refPath.Extensions = _x.GetExtensions()
+      If Not refPath.Extensions.Contains(refPath.Extension) Then
+        _match = False
+        _conf -= 1
+      End If
+    End If
   End Sub
 
   ''' <summary>
@@ -2017,7 +2156,7 @@ Public Class StructureCandidate
   Public Sub CheckForLinkVariables(Optional ByVal Node As XmlElement = Nothing)
     Static blnReplaced As Boolean = False
     If Node Is Nothing Then
-      Node = _x
+      Node = _x '.XElement
       blnReplaced = False
       'Log(New String("v", 20))
     End If
@@ -2038,7 +2177,8 @@ Public Class StructureCandidate
         Next
       End If
     End If
-    If Not Node.ParentNode.Name = "Structure" Then
+    If Not String.Equals(Node.ParentNode.Name, "Structure", StringComparison.OrdinalIgnoreCase) _
+      And Not String.Equals(Node.Name, "Structure", StringComparison.OrdinalIgnoreCase) Then
       CheckForLinkVariables(Node.ParentNode)
     Else
       If Not blnReplaced Then
@@ -2053,71 +2193,86 @@ Public Class StructureCandidate
   ''' </summary>
   ''' <returns></returns>
   ''' <remarks></remarks>
-  Private Function Match() As Boolean
+  Private Function Match(Optional ByVal CheckExtensions As Boolean = False) As Boolean
     _conf = -1
+    '' Check if path is default path
+    If _structpath.PStructure.defaultPaths.Contains(_structpath.UNCPath) Then
+      Log("Path is default path")
+      _conf = 100
+      Return True
+    End If
+
     Dim msg As New StringBuilder
     Dim strTemp As String = _structpath.UNCPath
     '' Fix if a file
     If strTemp.LastIndexOf(".") > strTemp.LastIndexOf("\") Then strTemp = strTemp.Remove(strTemp.LastIndexOf("."))
+    If _spath.LastIndexOf(".") > _spath.LastIndexOf("\") Then _spath = _spath.Remove(_spath.LastIndexOf("."))
+
+    If strTemp.LastIndexOf("\") = strTemp.Length - 1 Then strTemp = strTemp.Remove(strTemp.Length - 1)
+    If _spath.LastIndexOf("\") = _spath.Length - 1 Then _spath = _spath.Remove(_spath.Length - 1)
 
     '' Iterate through each character and compare. Watch out for variables and peek into _path for next character
-    Dim s As String() = _structpath.Variables.Replace(_spath).Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries) '_pstruct.ReplaceVariables(_spath, _path).Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
-    Dim f As String() = strTemp.Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
-    Dim si As Integer
-    msg.AppendLine("Comparing '" & SurroundJoin(s, "[", "]") & "'(" & s.Length.ToString & ") to '" & SurroundJoin(f, "[", "]") & "'(" & f.Length.ToString & ") from path '" & _structpath.UNCPath & "'")
-    msg.AppendLine("XPath: " & _xpath)
-    If s.Length = f.Length Then
-      For i = 0 To s.Length - 1 Step 1
-        msg.AppendLine(vbTab & "(" & i.ToString & ")'" & s(i) & "' = '" & f(i) & "'")
-        If i < f.Length Then
-          If s(i).IndexOf("{") >= 0 And s(i).IndexOf("}") >= 0 Then
-            '' Iterate through each character and compare. Watch out for variables and peek into _path for next character
-            si = 0
-            For j = 0 To f(i).Length - 1 Step 1
-              If String.Equals(s(i)(si), "{") Then
-                Do Until String.Equals(s(i)(si), "}") Or si = (s(i).Length - 1) '' Try to skip to the end of the variable
-                  si += 1
-                Loop
-                If Not si = (s(i).Length - 1) Then si += 1 '' Move index just past the end of the variable
-                Do Until String.Equals(f(i)(j), s(i)(si), StringComparison.OrdinalIgnoreCase) Or (j = f(i).Length - 1) '' Try to get to the next matching character or end of string
-                  j += 1
-                Loop
-              End If
-              msg.AppendLine("'" & s(i)(si) & "'(" & si.ToString & "/" & (s(i).Length - 1).ToString & ") = '" & f(i)(j) & "'(" & j.ToString & "/" & (f(i).Length - 1).ToString & ")")
-              '' If the last string is '}' then it doesn't matter, continue without error
-              If (si = (s(i).Length - 1)) And String.Equals(s(i)(si), "}") Then
-                Continue For
-              End If
-              '' Now check if the current character is equal at all. If not, then setup confidence score. Skip if both indices are at end
-              'If Not (j = (f(i).Length - 1)) And (si = (s(i).Length - 1)) Then
-              If Not String.Equals(s(i)(si), f(i)(j), StringComparison.OrdinalIgnoreCase) Then
-                _conf = (((i / (s.Length)) * 100) + ((j / (f(i).Length)) * 10)) '' Confidence score 1's
-                Exit For
-              Else
-                If Not (si = (s(i).Length - 1)) Then
-                  si += 1 '' Increment the structure index
+    If _spath.Split({"\\", "\"}, System.StringSplitOptions.None).Length = strTemp.Split({"\\", "\"}, System.StringSplitOptions.None).Length Then
+      Dim s As String() = _structpath.Variables.Replace(_spath).Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries) '_pstruct.ReplaceVariables(_spath, _path).Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
+      Dim f As String() = strTemp.Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
+      Dim si As Integer
+      msg.AppendLine("Comparing '" & SurroundJoin(s, "[", "]") & "'(" & s.Length.ToString & ") to '" & SurroundJoin(f, "[", "]") & "'(" & f.Length.ToString & ") from path '" & _structpath.UNCPath & "'")
+      msg.AppendLine("XPath: " & _xpath)
+      If s.Length = f.Length Then
+        For i = 0 To s.Length - 1 Step 1
+          msg.AppendLine(vbTab & "(" & i.ToString & ")'" & s(i) & "' = '" & f(i) & "'")
+          If i < f.Length Then
+            If s(i).IndexOf("{") >= 0 And s(i).IndexOf("}") >= 0 Then
+              '' Iterate through each character and compare. Watch out for variables and peek into _path for next character
+              si = 0
+              For j = 0 To f(i).Length - 1 Step 1
+                If String.Equals(s(i)(si), "{") Then
+                  Do Until String.Equals(s(i)(si), "}") Or si = (s(i).Length - 1) '' Try to skip to the end of the variable
+                    si += 1
+                  Loop
+                  If Not si = (s(i).Length - 1) Then si += 1 '' Move index just past the end of the variable
+                  Do Until String.Equals(f(i)(j), s(i)(si), StringComparison.OrdinalIgnoreCase) Or (j = f(i).Length - 1) '' Try to get to the next matching character or end of string
+                    j += 1
+                  Loop
                 End If
+                msg.AppendLine("'" & s(i)(si) & "'(" & si.ToString & "/" & (s(i).Length - 1).ToString & ") = '" & f(i)(j) & "'(" & j.ToString & "/" & (f(i).Length - 1).ToString & ")")
+                '' If the last string is '}' then it doesn't matter, continue without error
+                If (si = (s(i).Length - 1)) And String.Equals(s(i)(si), "}") Then
+                  Continue For
+                End If
+                '' Now check if the current character is equal at all. If not, then setup confidence score. Skip if both indices are at end
+                'If Not (j = (f(i).Length - 1)) And (si = (s(i).Length - 1)) Then
+                If Not String.Equals(s(i)(si), f(i)(j), StringComparison.OrdinalIgnoreCase) Then
+                  _conf = (((i / (s.Length)) * 100) + ((j / (f(i).Length)) * 10)) '' Confidence score 1's
+                  Exit For
+                Else
+                  If Not (si = (s(i).Length - 1)) Then
+                    si += 1 '' Increment the structure index
+                  End If
+                End If
+                'End If
+              Next
+              If Not si = (s(i).Length - 1) Then '' Check if the standard was incomplete, meaning that the object path didn't have the next required character
+                _conf = (i / (s.Length)) * 100 '' Confidence score 10's
               End If
-              'End If
-            Next
-            If Not si = (s(i).Length - 1) Then '' Check if the standard was incomplete, meaning that the object path didn't have the next required character
+              If _conf > -1 Then '' If the confidence has changed, exit the loop as it has failed
+                Exit For
+              End If
+            ElseIf Not String.Equals(s(i), f(i), StringComparison.OrdinalIgnoreCase) Then '' Full comparison check
               _conf = (i / (s.Length)) * 100 '' Confidence score 10's
-            End If
-            If _conf > -1 Then '' If the confidence has changed, exit the loop as it has failed
               Exit For
             End If
-          ElseIf Not String.Equals(s(i), f(i), StringComparison.OrdinalIgnoreCase) Then '' Full comparison check
-            _conf = (i / (s.Length)) * 100 '' Confidence score 10's
-            Exit For
           End If
-        End If
-      Next
+        Next
+      Else
+        msg.AppendLine("_spath = " & _spath)
+        _conf = 0 '' Ensure positive
+      End If
+      msg.AppendLine(vbTab & "Match percentage: " & _conf.ToString)
     Else
-      msg.AppendLine("_spath = " & _spath)
-      _conf = 0 '' Ensure positive
+      msg.AppendLine(vbTab & "Aborted due to invalid array lengths")
+      _conf = 0
     End If
-    msg.AppendLine(vbTab & "Match percentage: " & _conf.ToString)
-    'Log(msg.ToString)
     'Debug.WriteLine(msg.ToString)
     If _conf = -1 Then
       _conf = 100
@@ -2152,6 +2307,315 @@ Public Class StructureCandidate
     End If
     Return lst
   End Function
+End Class
+
+''' <summary>
+''' Represents a list of valid extensions that can be associated with a Path.
+''' </summary>
+''' <remarks></remarks>
+Public Class Extensions
+  Private _pathStruct As PathStructure
+  Private _namedStruct As XmlElement
+  Private _exts As List(Of Extension)
+
+  ''' <summary>
+  ''' Returns an Extension object at the specified index.
+  ''' </summary>
+  ''' <param name="Index">Index of the Extension in the current Extensions list.</param>
+  ''' <value></value>
+  ''' <returns>Extension</returns>
+  ''' <remarks></remarks>
+  Default Public ReadOnly Property Item(ByVal Index As Integer)
+    Get
+      If _exts.Count > Index Then
+        Return _exts(Index)
+      Else
+        Return Nothing
+      End If
+    End Get
+  End Property
+  ''' <summary>
+  ''' Returns the current Extensions list of Extension objects.
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>List(Of Extension)</returns>
+  ''' <remarks></remarks>
+  Public ReadOnly Property ExtensionList As List(Of Extension)
+    Get
+      Return _exts
+    End Get
+  End Property
+
+  Public Sub New(ByVal PathStruct As PathStructure, ByVal NamedStructure As XmlElement)
+    _pathStruct = PathStruct
+    _namedStruct = NamedStructure
+    _exts = New List(Of Extension)
+
+    If _namedStruct IsNot Nothing Then
+      If _namedStruct.HasAttribute("exts") Then
+        Dim strTemp As String = _namedStruct.Attributes("exts").Value
+        Dim kyval As String()
+        If strTemp.IndexOf("|") >= 0 Then
+          Dim exts As String() = strTemp.Split({"|"}, System.StringSplitOptions.RemoveEmptyEntries)
+          For i = 0 To exts.Length - 1 Step 1
+            If exts(i).IndexOf(":") >= 0 Then
+              kyval = exts(i).Split({":"}, System.StringSplitOptions.RemoveEmptyEntries)
+              If kyval.Length = 2 Then
+                Dim ext As New Extension(_pathStruct.Settings.SelectSingleNode("//Extension[@name='" & kyval(0) & "']"))
+                ext.Occurance = Convert.ToInt32(kyval(1))
+                _exts.Add(ext)
+              End If
+            End If
+          Next
+        Else
+          If strTemp.IndexOf(":") >= 0 Then
+            kyval = strTemp.Split({":"}, System.StringSplitOptions.RemoveEmptyEntries)
+            If kyval.Length = 2 Then
+              Dim ext As New Extension(_pathStruct.Settings.SelectSingleNode("//Extension[@name='" & kyval(0) & "']"))
+              ext.Occurance = Convert.ToInt32(kyval(1))
+              _exts.Add(ext)
+            End If
+          End If
+        End If
+      End If
+    End If
+
+    'Log("Extensions: " & _exts.Count.ToString & vbLf & vbTab & _namedStruct.OuterXml)
+  End Sub
+
+  Public Function GetHighestMatch() As Extension
+    Dim ext As Extension
+    Dim rating As Integer = -1
+    For i = 0 To _exts.Count - 1 Step 1
+      If _exts(i).Occurance > rating Then
+        ext = _exts(i)
+        rating = ext.Occurance
+      End If
+    Next
+    Return ext
+  End Function
+
+  Public Sub SetExtensions()
+    If _exts.Count > 0 Then
+      Dim x As XmlElement = _pathStruct.Settings.SelectSingleNode(FindXPath(_namedStruct))
+      If x IsNot Nothing Then
+        Dim attr As XmlAttribute
+        If x.HasAttribute("exts") Then
+          attr = x.Attributes("exts")
+        Else
+          attr = _pathStruct.Settings.CreateAttribute("exts")
+        End If
+        Dim extlst As New List(Of String)
+        For i = 0 To _exts.Count - 1 Step 1
+          If Not String.IsNullOrEmpty(_exts(i).Name) Then
+            extlst.Add(_exts(i).Name & ":" & _exts(i).Occurance.ToString)
+          End If
+        Next
+        attr.Value = String.Join("|", extlst.ToArray)
+        If Not String.IsNullOrEmpty(attr.Value) Then
+          If x.HasAttribute("exts") Then
+            x.Attributes("exts").Value = attr.Value
+          Else
+            x.Attributes.Append(attr)
+          End If
+        End If
+      End If
+    End If
+    Try
+      _pathStruct.Settings.Save(_pathStruct.SettingsPath)
+    Catch ex As Exception
+      Log("Couldn't save the settings file due to process error: " & ex.Message)
+    End Try
+  End Sub
+
+  ''' <summary>
+  ''' Adds a new extension to the Path Structure settings document.
+  ''' </summary>
+  ''' <param name="Name">The name of the extensions (ex. TXT or VB)</param>
+  ''' <remarks></remarks>
+  Public Sub AddExtension(ByVal Name As String)
+    If Not String.IsNullOrEmpty(FormatExtension(Name)) Then
+      Dim ext As XmlElement
+
+      '' Check if Settings contains Extension node
+      Dim exts As XmlNodeList = _pathStruct.Settings.SelectNodes("//Extension[@name='" & Name & "']")
+      Dim attr As XmlAttribute
+      If exts.Count = 0 Then
+        '' Create the extension
+        ext = _pathStruct.Settings.CreateElement("Extension")
+        attr = _pathStruct.Settings.CreateAttribute("name")
+        attr.Value = Name
+        ext.Attributes.Append(attr)
+        attr = _pathStruct.Settings.CreateAttribute("description")
+        attr.Value = "{New Extension}"
+        ext.Attributes.Append(attr)
+        ext = _pathStruct.Settings.SelectSingleNode("//Extensions").AppendChild(ext)
+        _pathStruct.Settings.Save(_pathStruct.SettingsPath)
+      ElseIf exts.Count > 1 Then
+        'Log("PathStructure_Extensions: There shouldn't be more than one extension in the Settings file.")
+      ElseIf exts.Count = 1 Then
+        ext = exts(0)
+      Else
+        'Log("PathStructure_Extensions: exts.Count is less than 0?")
+      End If
+
+      If Not Contains(Name) Then
+        If ext IsNot Nothing Then
+          Dim nwExt As New Extension(ext)
+          nwExt.Occurance = 1
+          _exts.Add(nwExt)
+          'Log("PathStructure_Extensions: Adding '" & Name & "' to extension list")
+        Else
+          'Log("PathStructure_Extensions: Couldn't add '" & Name & "' to extension list because the Extension node could not be found")
+        End If
+      Else
+        _exts.Item(IndexOf(Name)).Occurance += 1
+        'Log("PathStructure_Extensions: Trying to increase the count of extension '" & Name & "' to " & _exts.Item(IndexOf(Name)).Occurance.ToString)
+      End If
+
+      SetExtensions()
+    End If
+  End Sub
+
+  ''' <summary>
+  ''' Removes unnecessary '.' from the name
+  ''' </summary>
+  ''' <param name="Name">Extension name (ex. TXT or .TXT or VB or .VB)</param>
+  ''' <returns>String</returns>
+  ''' <remarks></remarks>
+  Private Function FormatExtension(ByRef Name As String) As String
+    If Name.IndexOf(".") = 0 Then
+      Name = Name.Remove(0, 1)
+    End If
+    Name = Name.ToUpper
+    Return Name
+  End Function
+
+  ''' <summary>
+  ''' Returns whether or not the current Extensions list contains the provided name
+  ''' </summary>
+  ''' <param name="Name">Extension name (ex. TXT or VB)</param>
+  ''' <returns>Boolean</returns>
+  ''' <remarks></remarks>
+  Public Overloads Function Contains(ByVal Name As String) As Boolean
+    FormatExtension(Name)
+    For i = 0 To _exts.Count - 1 Step 1
+      If String.Equals(_exts(i).Name, Name, StringComparison.OrdinalIgnoreCase) Then
+        Return True
+      End If
+    Next
+    Return False
+  End Function
+  ''' <summary>
+  ''' Returns whether or not the current Extensions list contains the provided Extension object.
+  ''' </summary>
+  ''' <param name="Ext">Extension object</param>
+  ''' <returns>Boolean</returns>
+  ''' <remarks></remarks>
+  Public Overloads Function Contains(ByVal Ext As Extension) As Boolean
+    Return _exts.Contains(Ext)
+  End Function
+
+  ''' <summary>
+  ''' Returns the index of the provided Extension
+  ''' </summary>
+  ''' <param name="Ext">Extension object</param>
+  ''' <returns>Integer</returns>
+  ''' <remarks></remarks>
+  Public Overloads Function IndexOf(ByVal Ext As Extension) As Integer
+    For i = 0 To _exts.Count - 1 Step 1
+      If _exts(i).Equals(Ext) Then
+        Return i
+      End If
+    Next
+    Return -1
+  End Function
+  ''' <summary>
+  ''' Returns the index of the provided extension name
+  ''' </summary>
+  ''' <param name="Name">Extension name (ex. TXT or VB)</param>
+  ''' <returns>Integer</returns>
+  ''' <remarks></remarks>
+  Public Overloads Function IndexOf(ByVal Name As String) As Integer
+    FormatExtension(Name)
+    For i = 0 To _exts.Count - 1 Step 1
+      If _exts(i).Name.Equals(Name, StringComparison.OrdinalIgnoreCase) Then
+        Return i
+      End If
+    Next
+    Return -1
+  End Function
+
+  ''' <summary>
+  ''' Represents a PathStructure extension
+  ''' </summary>
+  ''' <remarks></remarks>
+  Public Class Extension
+    Private _x As XmlElement
+    Private _cnt As Integer = 1
+
+    ''' <summary>
+    ''' Returns a reference to the PathStructure settings XmlElement
+    ''' </summary>
+    ''' <value></value>
+    ''' <returns></returns>
+    ''' <remarks></remarks>
+    Public ReadOnly Property XElement As XmlElement
+      Get
+        Return _x
+      End Get
+    End Property
+    Public ReadOnly Property Name As String
+      Get
+        If _x IsNot Nothing Then
+          If _x.HasAttribute("name") Then
+            Return _x.Attributes("name").Value
+          End If
+        End If
+        Return ""
+      End Get
+    End Property
+    Public ReadOnly Property Description As String
+      Get
+        If _x IsNot Nothing Then
+          If _x.HasAttribute("description") Then
+            Return _x.Attributes("description").Value
+          End If
+        End If
+        Return ""
+      End Get
+    End Property
+    Public Property Occurance As Integer
+      Get
+        Return _cnt
+      End Get
+      Set(value As Integer)
+        _cnt = value
+      End Set
+    End Property
+
+    Public Overrides Function ToString() As String
+      Return Name
+    End Function
+    Public Overrides Function Equals(obj As Object) As Boolean
+      Dim typ As Type = obj.GetType
+      If typ.GetProperty("Name") IsNot Nothing Then
+        Return String.Equals(Me.Name, obj.Name)
+      Else
+        Return False
+      End If
+    End Function
+    Public Overloads Shared Operator =(ByVal cObject As Extension, ByVal aObject As Object)
+      Return cObject.Equals(aObject)
+    End Operator
+    Public Overloads Shared Operator <>(ByVal cObject As Extension, ByVal aObject As Object)
+      Return (Not cObject.Equals(aObject))
+    End Operator
+
+    Public Sub New(ByVal Element As XmlElement)
+      _x = Element
+    End Sub
+  End Class
 End Class
 
 ''' <summary>
@@ -2385,10 +2849,20 @@ Public Class DatabaseConnection
   End Class
 End Class
 
+''' <summary>
+''' Represents a list of Windows user profiles/groups with specific permissions groups.
+''' </summary>
+''' <remarks></remarks>
 Public Class Users
   Private _usrs As List(Of User)
   Private _node As XmlElement
 
+  ''' <summary>
+  ''' Returns a list of PathStructure User objects
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns>List(Of User)</returns>
+  ''' <remarks></remarks>
   Public Property Users As List(Of User)
     Get
       Return _usrs
@@ -2411,6 +2885,12 @@ Public Class Users
     End If
   End Sub
 
+  ''' <summary>
+  ''' Sets all the PathStructure preferred permissions (referenced by permissions group name) for the provided filesystem path.
+  ''' </summary>
+  ''' <param name="Path">Filesystem path to receive permissions</param>
+  ''' <param name="GroupName">Name of the PermissionsGroup to apply to the provided path</param>
+  ''' <remarks></remarks>
   Public Sub SetPermissionsByGroup(ByVal Path As String, ByVal GroupName As String)
     If _usrs.Count > 0 Then
       For i = 0 To _usrs.Count - 1 Step 1
@@ -2470,16 +2950,32 @@ Public Class Users
     End If
   End Sub
 
+  ''' <summary>
+  ''' Represents a Windows user profile/group with a list permissions groups
+  ''' </summary>
+  ''' <remarks></remarks>
   Public Class User
     Private _name As String
     Private _perm As List(Of PermissionsGroup)
     Private _node As XmlElement
 
+    ''' <summary>
+    ''' Returns the name of the Windows Profile or Group
+    ''' </summary>
+    ''' <value></value>
+    ''' <returns></returns>
+    ''' <remarks></remarks>
     Public ReadOnly Property UserName As String
       Get
         Return _name
       End Get
     End Property
+    ''' <summary>
+    ''' Returns a list of PermissionsGroup objects related to the current User
+    ''' </summary>
+    ''' <value></value>
+    ''' <returns></returns>
+    ''' <remarks></remarks>
     Public Property PermissionGroups As List(Of PermissionsGroup)
       Get
         Return _perm
@@ -2503,16 +2999,32 @@ Public Class Users
       End If
     End Sub
 
+    ''' <summary>
+    ''' Represents a list of filesystem permissions relative to a common group name
+    ''' </summary>
+    ''' <remarks></remarks>
     Public Class PermissionsGroup
       Private _grp As String
       Private _perms As List(Of Permission)
       Private _node As XmlElement
 
+      ''' <summary>
+      ''' Returns the PathStructure Permissions group name.
+      ''' </summary>
+      ''' <value></value>
+      ''' <returns>String</returns>
+      ''' <remarks></remarks>
       Public ReadOnly Property GroupName As String
         Get
           Return _grp
         End Get
       End Property
+      ''' <summary>
+      ''' Returns a list of PathStructure Permission objects
+      ''' </summary>
+      ''' <value></value>
+      ''' <returns>List(Of Permission)</returns>
+      ''' <remarks></remarks>
       Public Property Permissions As List(Of Permission)
         Get
           Return _perms
@@ -2521,6 +3033,12 @@ Public Class Users
           _perms = value
         End Set
       End Property
+      ''' <summary>
+      ''' Returns the PathStructure settings reference XmlElement for the current Permissions group
+      ''' </summary>
+      ''' <value></value>
+      ''' <returns>XmlElement</returns>
+      ''' <remarks></remarks>
       Public Property XElement As XmlElement
         Get
           Return _node
@@ -2546,6 +3064,10 @@ Public Class Users
         End If
       End Sub
 
+      ''' <summary>
+      ''' Represents a filesystem permission and whether permission is allowed or denied.
+      ''' </summary>
+      ''' <remarks></remarks>
       Public Class Permission
         Private _node As XmlElement
         Private _fsr As System.Security.AccessControl.FileSystemRights
