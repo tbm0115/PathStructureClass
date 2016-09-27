@@ -1,7 +1,6 @@
 ﻿Imports System.Xml, System.IO, System.Security.AccessControl, System.Text
 Imports HTML, HTML.HTMLWriter, HTML.HTMLWriter.HTMLTable
 Imports System.Data, System.Data.OleDb, System.Data.Sql, System.Data.SqlClient
-Imports DSOFile
 
 Public Class PathStructure
   Private _ERPCheck As Boolean = False
@@ -15,6 +14,10 @@ Public Class PathStructure
   Private _structs As List(Of StructureStyle)
   Public ERPConnection As DatabaseConnection ' New DatabaseConnection(My.Settings.ERPConnection)
   Private _xmlPath As String
+
+  Public Function IsNull() As Boolean
+    Return Me Is Nothing
+  End Function
 
   Public ReadOnly Property SettingsPath As String
     Get
@@ -282,6 +285,10 @@ Public Class PathStructure
     Private _x As XmlElement
     Private _chld As List(Of PathStyle)
 
+    Public Function IsNull() As Boolean
+      Return Me Is Nothing
+    End Function
+
     Public Property Name As String
       Get
         If _x.HasAttribute("name") Then
@@ -373,6 +380,10 @@ Public Class PathStructure
     Private _type As PathStyleType
     Private _parent As PathStyle
     Private _chld As List(Of PathStyle)
+
+    Public Function IsNull() As Boolean
+      Return Me Is Nothing
+    End Function
 
     Public ReadOnly Property XElement As XmlElement
       Get
@@ -613,13 +624,14 @@ Public Class Path : Implements IDisposable
   ''' <remarks></remarks>
   Public ReadOnly Property ParentPath As String
     Get
-      Dim splt As String() = _path.Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
-      If splt.Length > 1 Then
-        ReDim Preserve splt(splt.Length - 2)
-        Return "\\" & String.Join("\", splt)
-      Else
-        Return ""
+      If Not IsNothing(_path) Then
+        Dim splt As String() = _path.Split({"\\", "\"}, System.StringSplitOptions.RemoveEmptyEntries)
+        If splt.Length > 1 Then
+          ReDim Preserve splt(splt.Length - 2)
+          Return "\\" & String.Join("\", splt)
+        End If
       End If
+      Return ""
     End Get
   End Property
   ''' <summary>
@@ -837,6 +849,9 @@ Public Class Path : Implements IDisposable
 #End Region
 
 #Region "Overrides"
+  Public Function IsNull() As Boolean
+    Return String.IsNullOrEmpty(_path)
+  End Function
   ''' <summary>
   ''' Returns the UNC path of the current Path.
   ''' </summary>
@@ -902,31 +917,19 @@ Public Class Path : Implements IDisposable
     End If
     '' Find relevant Structure
     _structStyle = _pstruct.FindStructureStyle(_path)
-    _struct = _structStyle.XElement
+    If _structStyle IsNot Nothing Then
+      _struct = _structStyle.XElement
+      If _struct.SelectSingleNode("Users") IsNot Nothing Then
+        _users = New Users(_struct.SelectSingleNode("Users"))
+      End If
 
-    'Dim structs As XmlNodeList = myXML.SelectNodes("//Structure")
-    'For i = 0 To structs.Count - 1 Step 1
-    '  If _path.IndexOf(structs(i).Attributes("defaultPath").Value, System.StringComparison.OrdinalIgnoreCase) >= 0 Then
-    '    _struct = structs(i)
-    '    Exit For
-    '  End If
-    'Next
-    'If _struct Is Nothing Then Throw New ArgumentException("PathStructure: Couldn't determine the default Structure node from '" & _path & "'. Searched " & structs.Count.ToString & " Structures in XmlDocument.")
+      '' Enumerate variables
+      _variables = New VariableArray(_struct.SelectSingleNode("Variables"), Me)
 
-    '_defaultPath = _struct.Attributes("path").Value
-    If _struct.SelectSingleNode("Users") IsNot Nothing Then
-      _users = New Users(_struct.SelectSingleNode("Users"))
+      '' Compare to Path Structure
+      IsNameStructured()
     End If
 
-    'Dim defSeparator As Integer = CountStringOccurance(_defaultPath, IO.Path.DirectorySeparatorChar)
-    '' Enumerate variables
-    _variables = New VariableArray(_struct.SelectSingleNode("Variables"), Me)
-
-    '' Set Start path
-    '_startPath = _defaultPath & "\" & Variables.Replace(_struct.Attributes("path").Value)
-
-    '' Compare to Path Structure
-    IsNameStructured()
   End Sub
 
   ''' <summary>
@@ -952,6 +955,9 @@ Public Class Path : Implements IDisposable
   Public Function IsNameStructured() As Boolean
     Static blnFound As Boolean = False
     If blnFound Then Return blnFound '' Dont run this routine more than once
+
+    '' Go ahead and exit if the structure was not found
+    If _struct Is Nothing Then Return False
 
     '' Initialize candidates
     _candidates = New StructureCandidateArray(Me)
@@ -995,9 +1001,6 @@ Public Class Path : Implements IDisposable
           End If
         Next
         If _candidates.Count = 1 Then
-          Dim m_file As DSOFile.OleDocumentProperties
-          m_file = New DSOFile.OleDocumentProperties
-          m_file.Open(_path, True, dsoFileOpenOptions.dsoOptionDefault)
           blnFound = True
         End If
       Else
@@ -1134,6 +1137,10 @@ Public Class Path : Implements IDisposable
     Private _auditpath As Path
     Private ERPVariables As New SortedList(Of String, String)
     Private _quit As Boolean = False
+
+    Public Function IsNull() As Boolean
+      Return Me Is Nothing
+    End Function
 
     ''' <summary>
     ''' Gets the HTML markup for the report.
@@ -1593,6 +1600,10 @@ Public Class VariableArray
   Private _refpath As PathStructureClass.Path
   Private _lst As New List(Of Variable)
 
+  Public Function IsNull() As Boolean
+    Return Me Is Nothing
+  End Function
+
   Default Public Property Item(ByVal Index As Integer) As Variable
     Get
       Return _lst(Index)
@@ -1739,6 +1750,10 @@ Public Class Variable
   Private _index As Integer
   Private _cmds As New List(Of ERPCommand)
   Private _refVarPath As Path
+
+  Public Function IsNull() As Boolean
+    Return Me Is Nothing
+  End Function
 
   Public ReadOnly Property Value As String
     Get
@@ -1896,6 +1911,10 @@ Public Class StructureCandidateArray
   Private _structarrpath As String
   Private _refPath As PathStructureClass.Path
 
+  Public Function IsNull() As Boolean
+    Return Me Is Nothing
+  End Function
+
   Default Public Property Item(ByVal Index As Integer) As StructureCandidate
     Get
       Return _lst(Index)
@@ -2001,6 +2020,10 @@ Public Class StructureCandidate
   Private _structpath As Path
   Private _match As Boolean
   Private _conf As Integer
+
+  Public Function IsNull() As Boolean
+    Return Me Is Nothing
+  End Function
 
   ''' <summary>
   ''' Gets the XPath for the candidate
@@ -2318,6 +2341,10 @@ Public Class Extensions
   Private _namedStruct As XmlElement
   Private _exts As List(Of Extension)
 
+  Public Function IsNull() As Boolean
+    Return Me Is Nothing
+  End Function
+
   ''' <summary>
   ''' Returns an Extension object at the specified index.
   ''' </summary>
@@ -2554,6 +2581,10 @@ Public Class Extensions
     Private _x As XmlElement
     Private _cnt As Integer = 1
 
+    Public Function IsNull() As Boolean
+      Return Me Is Nothing
+    End Function
+
     ''' <summary>
     ''' Returns a reference to the PathStructure settings XmlElement
     ''' </summary>
@@ -2631,6 +2662,10 @@ Public Class DatabaseConnection
   Private _oledbcmd As OleDbCommand
   Private _sqlcmd As SqlCommand
 
+  Public Function IsNull() As Boolean
+    Return Me Is Nothing
+
+  End Function
   ''' <summary>
   ''' Gets the connection string that the current instance of the DatabaseConnection was initialized with.
   ''' </summary>
@@ -2857,6 +2892,10 @@ Public Class Users
   Private _usrs As List(Of User)
   Private _node As XmlElement
 
+  Public Function IsNull() As Boolean
+    Return Me Is Nothing
+  End Function
+
   ''' <summary>
   ''' Returns a list of PathStructure User objects
   ''' </summary>
@@ -2959,6 +2998,10 @@ Public Class Users
     Private _perm As List(Of PermissionsGroup)
     Private _node As XmlElement
 
+    Public Function IsNull() As Boolean
+      Return Me Is Nothing
+    End Function
+
     ''' <summary>
     ''' Returns the name of the Windows Profile or Group
     ''' </summary>
@@ -3007,6 +3050,10 @@ Public Class Users
       Private _grp As String
       Private _perms As List(Of Permission)
       Private _node As XmlElement
+
+      Public Function IsNull() As Boolean
+        Return Me Is Nothing
+      End Function
 
       ''' <summary>
       ''' Returns the PathStructure Permissions group name.
@@ -3072,6 +3119,11 @@ Public Class Users
         Private _node As XmlElement
         Private _fsr As System.Security.AccessControl.FileSystemRights
         Private _acc As System.Security.AccessControl.AccessControlType
+
+        Public Function IsNull() As Boolean
+          Return Me Is Nothing
+
+        End Function
 
         Public Property Rights As FileSystemRights
           Get

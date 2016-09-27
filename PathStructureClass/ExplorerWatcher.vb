@@ -52,6 +52,7 @@ Public Class ExplorerWatcher
     _cancel = True
     Try
       _watcher.Stop()
+      _cancel = False
     Catch ex As Exception
       Log("{ExplorerWatcher} Abort Failed: " & ex.Message)
     End Try
@@ -215,14 +216,17 @@ Public Class ExplorerWatcherFoundEventArgs
         Dim newPath As String
         If TryCast(_win.Document, IShellFolderViewDual) IsNot Nothing Then
           Dim sh As IShellFolderViewDual = DirectCast(_win.Document, IShellFolderViewDual)
-
-          If sh.FocusedItem IsNot Nothing Then
-            newPath = GetUNCPath(sh.FocusedItem.Path)
+          If sh IsNot Nothing Then
+            If sh.FocusedItem IsNot Nothing Then
+              newPath = GetUNCPath(sh.FocusedItem.Path)
+            End If
           End If
         ElseIf TryCast(_win.Document, ShellFolderView) IsNot Nothing Then
           Dim sh As ShellFolderView = DirectCast(_win.Document, ShellFolderView)
-          If sh.FocusedItem IsNot Nothing Then
-            newPath = GetUNCPath(sh.FocusedItem.Path)
+          If sh IsNot Nothing Then
+            If sh.FocusedItem IsNot Nothing Then
+              newPath = GetUNCPath(sh.FocusedItem.Path)
+            End If
           End If
         End If
         If Not String.Equals(_path, newPath, StringComparison.OrdinalIgnoreCase) Then
@@ -232,7 +236,7 @@ Public Class ExplorerWatcherFoundEventArgs
           Return False
         End If
       Catch ex As Exception
-        Log("{Watcher} CheckWindow error: " & ex.Message)
+        Log("{ExplorerWatcher}(CheckWindow) PathStructure error: " & ex.Message)
         Return False
       End Try
     End Function
