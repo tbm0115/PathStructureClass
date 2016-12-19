@@ -642,9 +642,9 @@ Public Class Path : Implements IDisposable
   ''' <remarks></remarks>
   Public ReadOnly Property Children As Path()
     Get
-      If _type = PathType.Folder Then
-        If IsNothing(_children) Then
-          Dim arr As New List(Of Path)
+      If _children.IsNullOrEmpty() Then
+        Dim arr As New List(Of Path)
+        If _type = PathType.Folder Then
           Dim chk As Boolean
           Try
             For Each fil As String In IO.Directory.EnumerateFiles(_path)
@@ -661,15 +661,13 @@ Public Class Path : Implements IDisposable
                 arr.Add(tmp)
               End If
             Next
-            _children = arr.ToArray
           Catch ex As Exception
             Log("PathStructure: FSO child enumeration error. " & ex.Message)
           End Try
         End If
-        Return _children
-      Else
-        Return Nothing
+        _children = arr.ToArray()
       End If
+      Return _children
     End Get
   End Property
   ''' <summary>
@@ -1516,11 +1514,11 @@ Public Class Path : Implements IDisposable
   ''' <returns></returns>
   ''' <remarks></remarks>
   Public Function HasPath(ByVal Name As String, Optional ByRef ReferencePath As Path = Nothing) As Boolean
-    If ReferencePath Is Nothing Then
-      Return (GetPathByStructure(Name) IsNot Nothing)
-    Else
+    If Me.IsNameStructured() Then
       ReferencePath = GetPathByStructure(Name)
       Return (ReferencePath IsNot Nothing)
+    Else
+      Return False
     End If
   End Function
 
@@ -1532,16 +1530,19 @@ Public Class Path : Implements IDisposable
   ''' <remarks></remarks>
   Public Function GetPathByStructure(ByVal Name As String) As Path
     Dim objPath As Path = Nothing
-    If _type = PathType.Folder Then
-      For i = 0 To _children.Length - 1 Step 1
-        If _children(i).IsNameStructured() Then
-          If String.Equals(_children(i).StructureCandidates.GetHighestMatch().PathName, Name, StringComparison.OrdinalIgnoreCase) Then
-            objPath = _children(i)
+
+    If Me.Type = PathType.Folder AndAlso Me.IsNameStructured() AndAlso Not Me.Children.IsNullOrEmpty() Then
+      Dim chlds As Path() = Me.Children
+      For i = 0 To chlds.Length - 1 Step 1
+        If chlds(i).IsNameStructured() AndAlso chlds(i).StructureCandidates IsNot Nothing Then
+          Dim sc As StructureCandidate = chlds(i).StructureCandidates.GetHighestMatch()
+          If String.Equals(sc.PathName, Name, StringComparison.OrdinalIgnoreCase) Then
+            objPath = chlds(i)
             Exit For
           End If
         End If
-        If _children(i).Children.Length > 0 Then
-          objPath = _children(i).GetPathByStructure(Name)
+        If Not chlds(i).Children.IsNullOrEmpty() Then
+          objPath = chlds(i).GetPathByStructure(Name)
         End If
       Next
     End If
@@ -1912,7 +1913,7 @@ Public Class StructureCandidateArray
   Private _refPath As PathStructureClass.Path
 
   Public Function IsNull() As Boolean
-    Return Me Is Nothing
+    Return (Me Is Nothing)
   End Function
 
   Default Public Property Item(ByVal Index As Integer) As StructureCandidate
@@ -2125,12 +2126,12 @@ Public Class StructureCandidate
   ''' <remarks></remarks>
   Public ReadOnly Property PathName As String
     Get
-      'If _x.HasAttribute("name") Then
-      '  Return _x.Attributes("name").Value
-      'Else
-      '  Return ""
-      'End If
-      Return _x.Name
+      If _x.HasAttribute("name") Then
+        Return _x.Attributes("name").Value
+      Else
+        Return ""
+      End If
+      'Return _x.Name
     End Get
   End Property
 
@@ -2526,12 +2527,7 @@ Public Class Extensions
   ''' <remarks></remarks>
   Public Overloads Function Contains(ByVal Name As String) As Boolean
     FormatExtension(Name)
-    For i = 0 To _exts.Count - 1 Step 1
-      If String.Equals(_exts(i).Name, Name, StringComparison.OrdinalIgnoreCase) Then
-        Return True
-      End If
-    Next
-    Return False
+    Return IndexOf(Name) >= 0
   End Function
   ''' <summary>
   ''' Returns whether or not the current Extensions list contains the provided Extension object.
@@ -2551,6 +2547,7 @@ Public Class Extensions
   ''' <remarks></remarks>
   Public Overloads Function IndexOf(ByVal Ext As Extension) As Integer
     For i = 0 To _exts.Count - 1 Step 1
+      If _exts(i) = "*" Then Return True '' Wildcard returns true for everything
       If _exts(i).Equals(Ext) Then
         Return i
       End If
@@ -2631,7 +2628,11 @@ Public Class Extensions
     Public Overrides Function Equals(obj As Object) As Boolean
       Dim typ As Type = obj.GetType
       If typ.GetProperty("Name") IsNot Nothing Then
-        Return String.Equals(Me.Name, obj.Name)
+        If Me.Name = "*" Then
+          Return True
+        Else
+          Return String.Equals(Me.Name, obj.Name)
+        End If
       Else
         Return False
       End If

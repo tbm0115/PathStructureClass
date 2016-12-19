@@ -284,4 +284,8 @@ Public Module PathStructure_Helpers
     Return lst.ToArray
   End Function
 
+  <Extension> _
+  Public Function IsNullOrEmpty(ByVal Objs As Object()) As Boolean
+    Return Not (Objs IsNot Nothing AndAlso Objs.Length >= 0)
+  End Function
 End Module
