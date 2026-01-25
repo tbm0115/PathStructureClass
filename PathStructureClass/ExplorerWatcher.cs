@@ -12,7 +12,7 @@ namespace PathStructureClass
     public class ExplorerWatcher
     {
         private readonly PathStructure _pathStruct;
-        private readonly int _pollRate;
+        private readonly ExplorerWatcherOptions _options;
         private readonly Timer _watcher;
         private bool _cancel;
         private ExplorerWatcherFoundEventArgs _evt;
@@ -25,12 +25,13 @@ namespace PathStructureClass
         /// </summary>
         public event ExplorerWatcherFoundEventHandler ExplorerWatcherFound;
         public event EventHandler ExplorerWatcherAborted;
+        public event EventHandler<Exception> ExplorerWatcherError;
 
-        public ExplorerWatcher(PathStructure pathStruct, int pollRate = 500)
+        public ExplorerWatcher(PathStructure pathStruct, ExplorerWatcherOptions options = null)
         {
             _pathStruct = pathStruct;
-            _pollRate = pollRate;
-            _watcher = new Timer(_pollRate);
+            _options = options ?? new ExplorerWatcherOptions();
+            _watcher = new Timer(_options.PollRateMs);
             _watcher.Elapsed += ExplorerQuery;
             _cancel = false;
         }
@@ -56,7 +57,7 @@ namespace PathStructureClass
             }
             catch (Exception ex)
             {
-                PathStructure_Helpers.Log("{ExplorerWatcher} Abort Failed: " + ex.Message);
+                _options.Logger?.LogError("Abort failed.", ex);
             }
         }
 
@@ -106,6 +107,8 @@ namespace PathStructureClass
                 catch (Exception ex)
                 {
                     StopWatcher();
+                    _options.Logger?.LogError("ExplorerWatcher aborted.", ex);
+                    ExplorerWatcherError?.Invoke(this, ex);
                     // Go ahead and quit. Chances are that someone closed/opened windows too quickly
                     ExplorerWatcherAborted?.Invoke(this, new UnhandledExceptionEventArgs(ex, true));
                 }
@@ -298,5 +301,34 @@ namespace PathStructureClass
                 }
             }
         }
+    }
+
+    public class ExplorerWatcherOptions
+    {
+        public int PollRateMs { get; set; } = 500;
+        public IExplorerWatcherLogger Logger { get; set; }
+        public ICredentialProvider CredentialProvider { get; set; }
+    }
+
+    public interface IExplorerWatcherLogger
+    {
+        void LogError(string message, Exception exception);
+    }
+
+    public interface ICredentialProvider
+    {
+        bool TryGetCredential(string target, out ExplorerCredential credential);
+    }
+
+    public sealed class ExplorerCredential
+    {
+        public ExplorerCredential(string username, string password)
+        {
+            Username = username;
+            Password = password;
+        }
+
+        public string Username { get; }
+        public string Password { get; }
     }
 }

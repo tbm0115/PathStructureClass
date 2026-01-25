@@ -1,219 +1,226 @@
 using System;
 using System.Collections.Generic;
-using System.Data;
-using System.Data.OleDb;
-using System.Data.Sql;
-using System.Data.SqlClient;
-using System.Drawing;
-using System.IO;
-using System.Security.AccessControl;
-using System.Text;
-using System.Xml;
-using HTML;
-using HTML.HTMLWriter;
-using HTML.HTMLWriter.HTMLTable;
+using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace PathStructureClass
 {
     /// <summary>
-    /// C# rewrite scaffold of the original VB.NET PathStructure implementation.
+    /// Service for validating file system paths against a configured tree of regex-based nodes.
     /// </summary>
     public class PathStructure
     {
-        private bool _ERPCheck;
-        private XmlDocument _myXML;
-        private bool _DeleteThumbs;
-        private bool _HandleExtensions;
-        private bool _generateIcons;
-        private bool _setPermissions;
-        private string _ERPConnection;
-        public List<string> defaultPaths = new List<string>();
-        private List<StructureStyle> _structs;
-        public DatabaseConnection ERPConnection;
-        private string _xmlPath;
+        private readonly PathStructureConfig _config;
+        private readonly IReadOnlyList<IPathValidationRule> _validationRules;
 
-        public bool IsNull()
+        public PathStructure(PathStructureConfig config, IEnumerable<IPathValidationRule> validationRules = null)
         {
-            return ReferenceEquals(this, null);
+            _config = config ?? throw new ArgumentNullException(nameof(config));
+            _validationRules = (validationRules ?? Array.Empty<IPathValidationRule>()).ToList();
         }
 
-        public string SettingsPath => _xmlPath;
-
-        public bool CheckERPSystem
-        {
-            get => _ERPCheck;
-            set => _ERPCheck = value;
-        }
-
-        public XmlDocument Settings
-        {
-            get => _myXML;
-            set => _myXML = value;
-        }
-
-        public bool AllowDeletionOfThumbsDb
-        {
-            get => _DeleteThumbs;
-            set => _DeleteThumbs = value;
-        }
-
-        public string ERPSystemConnectionString
-        {
-            get => _ERPConnection;
-            set => _ERPConnection = value;
-        }
+        public PathStructureConfig Config => _config;
 
         /// <summary>
-        /// Sets whether or not a Path object will handle its extension during the IsNamedStructure() routine.
+        /// Validates a full path and returns details about matches and captured variables.
         /// </summary>
-        public bool HandleExtensions
+        public PathValidationResult ValidatePath(string fullPath)
         {
-            get => _HandleExtensions;
-            set => _HandleExtensions = value;
+            if (string.IsNullOrWhiteSpace(fullPath))
+            {
+                return PathValidationResult.Invalid("Path was empty.");
+            }
+
+            var normalizedPath = NormalizePath(fullPath);
+            var variables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var matchTrail = new List<PathMatchNode>();
+
+            var matchesRoot = TryMatchNode(_config.Root, normalizedPath, variables, matchTrail, out var failure);
+            if (!matchesRoot)
+            {
+                return PathValidationResult.Invalid(failure ?? "Path did not match the configured structure.");
+            }
+
+            foreach (var rule in _validationRules)
+            {
+                var ruleResult = rule.Validate(normalizedPath, variables, matchTrail);
+                if (!ruleResult.IsValid)
+                {
+                    return ruleResult;
+                }
+            }
+
+            return PathValidationResult.Valid(variables, matchTrail);
         }
 
-        /// <summary>
-        /// Sets whether or not the PathStructure will generate icon files while building the audit report.
-        /// </summary>
-        public bool GenerateIcons
+        private bool TryMatchNode(PathNode node,
+            string remainingPath,
+            Dictionary<string, string> variables,
+            List<PathMatchNode> matchTrail,
+            out string failure)
         {
-            get => _generateIcons;
-            set => _generateIcons = value;
+            failure = null;
+            if (node == null)
+            {
+                failure = "Root node was not configured.";
+                return false;
+            }
+
+            var regex = node.GetRegex(_config.RegexOptions);
+            var match = regex.Match(remainingPath);
+            if (!match.Success)
+            {
+                failure = $"Pattern '{node.Pattern}' did not match '{remainingPath}'.";
+                return false;
+            }
+
+            if (!CaptureVariables(match, variables, out failure))
+            {
+                return false;
+            }
+
+            matchTrail.Add(new PathMatchNode(node, match.Value));
+
+            if (node.Children.Count == 0)
+            {
+                return match.Value.Length == remainingPath.Length;
+            }
+
+            var unmatched = remainingPath.Substring(match.Value.Length).TrimStart('\\');
+            if (string.IsNullOrEmpty(unmatched))
+            {
+                return true;
+            }
+
+            foreach (var child in node.Children)
+            {
+                var childVariables = new Dictionary<string, string>(variables, StringComparer.OrdinalIgnoreCase);
+                var childTrail = new List<PathMatchNode>(matchTrail);
+                if (TryMatchNode(child, unmatched, childVariables, childTrail, out failure))
+                {
+                    variables.Clear();
+                    foreach (var kvp in childVariables)
+                    {
+                        variables[kvp.Key] = kvp.Value;
+                    }
+
+                    matchTrail.Clear();
+                    matchTrail.AddRange(childTrail);
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        /// <summary>
-        /// Sets whether or not the PathStructure will set permissions while building the audit report.
-        /// </summary>
-        public bool SetPermissions
+        private static bool CaptureVariables(Match match, Dictionary<string, string> variables, out string failure)
         {
-            get => _setPermissions;
-            set => _setPermissions = value;
+            failure = null;
+            foreach (var groupName in match.Groups.Keys)
+            {
+                if (int.TryParse(groupName, out _))
+                {
+                    continue;
+                }
+
+                var value = match.Groups[groupName].Value;
+                if (string.IsNullOrEmpty(value))
+                {
+                    continue;
+                }
+
+                if (variables.TryGetValue(groupName, out var existingValue))
+                {
+                    if (!string.Equals(existingValue, value, StringComparison.OrdinalIgnoreCase))
+                    {
+                        failure = $"Variable '{groupName}' was inconsistent ('{existingValue}' vs '{value}').";
+                        return false;
+                    }
+                }
+                else
+                {
+                    variables[groupName] = value;
+                }
+            }
+
+            return true;
         }
 
-        public List<StructureStyle> Structures => _structs;
-
-        public PathStructure()
+        private static string NormalizePath(string path)
         {
-        }
-
-        public PathStructure(string xmlPath)
-        {
-            _xmlPath = xmlPath;
-        }
-
-        public PathStructure(XmlDocument settings)
-        {
-            _myXML = settings;
-        }
-
-        public PathStructure(XmlDocument settings, bool checkERPSystem)
-        {
-            _myXML = settings;
-            _ERPCheck = checkERPSystem;
-        }
-
-        public virtual void Load(string xmlPath)
-        {
-            throw new NotImplementedException("Full conversion required.");
-        }
-
-        public virtual void Load(XmlDocument settings)
-        {
-            throw new NotImplementedException("Full conversion required.");
-        }
-
-        public virtual string ReplaceVariables(string path, VariableArray vars = null)
-        {
-            throw new NotImplementedException("Full conversion required.");
-        }
-
-        public virtual string XPathToPath(string xpath)
-        {
-            throw new NotImplementedException("Full conversion required.");
-        }
-
-        public virtual string XPathToPath(XmlElement xmlElement)
-        {
-            throw new NotImplementedException("Full conversion required.");
-        }
-
-        public virtual string PathToXPath(string path)
-        {
-            throw new NotImplementedException("Full conversion required.");
-        }
-
-        public virtual Path FindPath(string name)
-        {
-            throw new NotImplementedException("Full conversion required.");
-        }
-
-        public virtual Path FindPath(string name, string ext)
-        {
-            throw new NotImplementedException("Full conversion required.");
-        }
-
-        public class StructureStyle
-        {
-            public string Name { get; set; }
-            public string DefaultPath { get; set; }
-            public XmlElement Structure { get; set; }
-            public XmlElement Defaults { get; set; }
-            public XmlElement Permissions { get; set; }
-            public XmlElement Extensions { get; set; }
-            public XmlElement Audit { get; set; }
-            public XmlElement Users { get; set; }
-            public List<PathStyle> PathStyles { get; set; }
-        }
-
-        public class PathStyle
-        {
-            public string Name { get; set; }
-            public PathStyleType Type { get; set; }
-            public string XPath { get; set; }
-            public string Path { get; set; }
-            public string Regex { get; set; }
-            public XmlElement Node { get; set; }
-        }
-
-        public enum PathStyleType
-        {
-            Path,
-            File
+            return path.Trim();
         }
     }
 
-    public class Path : IDisposable
+    public class PathStructureConfig
     {
-        public void Dispose()
+        public PathStructureConfig(PathNode root)
         {
+            Root = root ?? throw new ArgumentNullException(nameof(root));
+        }
+
+        public PathNode Root { get; }
+        public RegexOptions RegexOptions { get; set; } = RegexOptions.IgnoreCase;
+    }
+
+    public class PathNode
+    {
+        public PathNode(string name, string pattern)
+        {
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+            Pattern = pattern ?? throw new ArgumentNullException(nameof(pattern));
+        }
+
+        public string Name { get; }
+        public string Pattern { get; }
+        public List<PathNode> Children { get; } = new List<PathNode>();
+
+        public Regex GetRegex(RegexOptions options)
+        {
+            return new Regex(Pattern, options | RegexOptions.Compiled);
         }
     }
 
-    public class VariableArray
+    public class PathMatchNode
     {
+        public PathMatchNode(PathNode node, string matchedValue)
+        {
+            Node = node ?? throw new ArgumentNullException(nameof(node));
+            MatchedValue = matchedValue;
+        }
+
+        public PathNode Node { get; }
+        public string MatchedValue { get; }
     }
 
-    public class Variable
+    public class PathValidationResult
     {
+        private PathValidationResult(bool isValid, string error, IReadOnlyDictionary<string, string> variables, IReadOnlyList<PathMatchNode> matchTrail)
+        {
+            IsValid = isValid;
+            Error = error;
+            Variables = variables ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            MatchTrail = matchTrail ?? Array.Empty<PathMatchNode>();
+        }
+
+        public bool IsValid { get; }
+        public string Error { get; }
+        public IReadOnlyDictionary<string, string> Variables { get; }
+        public IReadOnlyList<PathMatchNode> MatchTrail { get; }
+
+        public static PathValidationResult Valid(IReadOnlyDictionary<string, string> variables, IReadOnlyList<PathMatchNode> matchTrail)
+        {
+            return new PathValidationResult(true, null, variables, matchTrail);
+        }
+
+        public static PathValidationResult Invalid(string error)
+        {
+            return new PathValidationResult(false, error, null, null);
+        }
     }
 
-    public class StructureCandidateArray
+    public interface IPathValidationRule
     {
-    }
-
-    public class StructureCandidate
-    {
-    }
-
-    public class Extensions
-    {
-    }
-
-    public class DatabaseConnection
-    {
-    }
-
-    public class Users
-    {
+        PathValidationResult Validate(string fullPath, IReadOnlyDictionary<string, string> variables, IReadOnlyList<PathMatchNode> matchTrail);
     }
 }
