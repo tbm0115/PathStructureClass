@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Timers;
 using Shell32;
 using SHDocVw;
@@ -7,7 +6,7 @@ using SHDocVw;
 namespace PathStructureClass
 {
     /// <summary>
-    /// Uses Shell to get the users selection(s) within Windows Explorer/Internet Explorer
+    /// Uses Shell to get the users selection(s) within Windows Explorer/Internet Explorer.
     /// </summary>
     public class ExplorerWatcher
     {
@@ -17,16 +16,29 @@ namespace PathStructureClass
         private bool _cancel;
         private ExplorerWatcherFoundEventArgs _evt;
 
+        /// <summary>
+        /// Gets the current snapshot of watched windows.
+        /// </summary>
         public ExplorerWatcherFoundEventArgs CurrentFoundPaths => _evt;
 
         /// <summary>
-        /// This event is raised whenever a path selected in Windows Explorer or navigated to in Internet Explorer
-        /// is successfully validated in Path.IsNamedStructure() as it would in an audit.
+        /// Occurs when a watched window's path changes.
         /// </summary>
         public event ExplorerWatcherFoundEventHandler ExplorerWatcherFound;
+
+        /// <summary>
+        /// Occurs when the watcher stops unexpectedly.
+        /// </summary>
         public event EventHandler ExplorerWatcherAborted;
+
+        /// <summary>
+        /// Occurs when an error is encountered while polling windows.
+        /// </summary>
         public event EventHandler<Exception> ExplorerWatcherError;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ExplorerWatcher"/> class.
+        /// </summary>
         public ExplorerWatcher(PathStructure pathStruct, ExplorerWatcherOptions options = null)
         {
             _pathStruct = pathStruct;
@@ -37,7 +49,7 @@ namespace PathStructureClass
         }
 
         /// <summary>
-        /// Begins polling Shell for current contexts of Windows Explorer/Internet Explorer
+        /// Begins polling Shell for current contexts of Windows Explorer/Internet Explorer.
         /// </summary>
         public void StartWatcher()
         {
@@ -45,7 +57,7 @@ namespace PathStructureClass
         }
 
         /// <summary>
-        /// Requests that the polling abort
+        /// Requests that the polling abort.
         /// </summary>
         public void StopWatcher()
         {
@@ -61,16 +73,25 @@ namespace PathStructureClass
             }
         }
 
+        /// <summary>
+        /// Relays path updates to the external event.
+        /// </summary>
         private void WindowPathChanged(string url)
         {
             ExplorerWatcherFound?.Invoke(url);
         }
 
+        /// <summary>
+        /// Handles timer events for polling.
+        /// </summary>
         private void ExplorerQuery(object sender, ElapsedEventArgs e)
         {
             ExplorerQuery();
         }
 
+        /// <summary>
+        /// Performs a poll of open shell windows.
+        /// </summary>
         private void ExplorerQuery()
         {
             var exShell = new Shell();
@@ -120,215 +141,5 @@ namespace PathStructureClass
                 ExplorerWatcherAborted?.Invoke(this, new UnhandledExceptionEventArgs(new Exception("Cancel Requested"), true));
             }
         }
-    }
-
-    public delegate void ExplorerWatcherFoundEventHandler(string url);
-
-    public class ExplorerWatcherFoundEventArgs
-    {
-        private List<WindowWatch> _wins;
-
-        public event ExplorerWatcherFoundEventHandler PathChanged;
-
-        public WindowWatch this[int index]
-        {
-            get
-            {
-                if (index < _wins.Count)
-                {
-                    return _wins[index];
-                }
-
-                throw new IndexOutOfRangeException();
-            }
-            set
-            {
-                if (index < _wins.Count)
-                {
-                    _wins[index] = value;
-                    return;
-                }
-
-                throw new IndexOutOfRangeException();
-            }
-        }
-
-        public void Add(ShellBrowserWindow windowObject)
-        {
-            if (_wins == null)
-            {
-                _wins = new List<WindowWatch>();
-            }
-
-            if (!Contains(windowObject.HWND))
-            {
-                _wins.Add(new WindowWatch(windowObject));
-            }
-            else
-            {
-                if (_wins[IndexOf(windowObject.HWND)].CheckWindow(windowObject))
-                {
-                    PathChanged?.Invoke(_wins[IndexOf(windowObject.HWND)].URL);
-                }
-            }
-        }
-
-        public void Check(ShellBrowserWindow windowObject)
-        {
-            if (Contains(windowObject.HWND))
-            {
-                if (_wins[IndexOf(windowObject.HWND)].CheckWindow(windowObject))
-                {
-                    PathChanged?.Invoke(_wins[IndexOf(windowObject.HWND)].URL);
-                }
-            }
-        }
-
-        public void Remove(WindowWatch watch)
-        {
-            if (Contains(watch.WindowHandle))
-            {
-                RemoveAt(IndexOf(watch.WindowHandle));
-                return;
-            }
-
-            throw new IndexOutOfRangeException();
-        }
-
-        public void RemoveAt(int index)
-        {
-            if (index < _wins.Count)
-            {
-                _wins.RemoveAt(index);
-                return;
-            }
-
-            throw new IndexOutOfRangeException();
-        }
-
-        private void ChildPathChanged(string url, EventArgs e)
-        {
-            PathChanged?.Invoke(url);
-        }
-
-        private void RemoveWindow(ShellBrowserWindow hWindow, EventArgs e)
-        {
-            if (Contains(hWindow.HWND))
-            {
-                RemoveAt(IndexOf(hWindow.HWND));
-            }
-        }
-
-        public bool Contains(int windowHandle)
-        {
-            return IndexOf(windowHandle) >= 0;
-        }
-
-        public int IndexOf(int windowHandle)
-        {
-            if (_wins != null)
-            {
-                for (var i = 0; i < _wins.Count; i += 1)
-                {
-                    if (_wins[i].WindowHandle == windowHandle)
-                    {
-                        return i;
-                    }
-                }
-            }
-
-            return -1;
-        }
-
-        public class WindowWatch
-        {
-            private ShellBrowserWindow _win;
-            private string _path;
-            private readonly int _handle;
-
-            public string URL => _path;
-
-            public ShellBrowserWindow Window
-            {
-                get => _win;
-                set => _win = value;
-            }
-
-            public int WindowHandle => _handle;
-
-            public WindowWatch(ShellBrowserWindow hWindow)
-            {
-                _win = hWindow;
-                _handle = hWindow.HWND;
-                CheckWindow(hWindow);
-            }
-
-            /// <summary>
-            /// Return true when the path changes
-            /// </summary>
-            public bool CheckWindow(ShellBrowserWindow windowObject)
-            {
-                try
-                {
-                    string newPath = null;
-                    if (_win.Document is IShellFolderViewDual shellFolderViewDual)
-                    {
-                        if (shellFolderViewDual.FocusedItem != null)
-                        {
-                            newPath = PathStructure_Helpers.GetUNCPath(shellFolderViewDual.FocusedItem.Path);
-                        }
-                    }
-                    else if (_win.Document is ShellFolderView shellFolderView)
-                    {
-                        if (shellFolderView.FocusedItem != null)
-                        {
-                            newPath = PathStructure_Helpers.GetUNCPath(shellFolderView.FocusedItem.Path);
-                        }
-                    }
-
-                    if (!string.Equals(_path, newPath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        _path = newPath;
-                        return true;
-                    }
-
-                    return false;
-                }
-                catch (Exception ex)
-                {
-                    PathStructure_Helpers.Log("{ExplorerWatcher}(CheckWindow) PathStructure error: " + ex.Message);
-                    return false;
-                }
-            }
-        }
-    }
-
-    public class ExplorerWatcherOptions
-    {
-        public int PollRateMs { get; set; } = 500;
-        public IExplorerWatcherLogger Logger { get; set; }
-        public ICredentialProvider CredentialProvider { get; set; }
-    }
-
-    public interface IExplorerWatcherLogger
-    {
-        void LogError(string message, Exception exception);
-    }
-
-    public interface ICredentialProvider
-    {
-        bool TryGetCredential(string target, out ExplorerCredential credential);
-    }
-
-    public sealed class ExplorerCredential
-    {
-        public ExplorerCredential(string username, string password)
-        {
-            Username = username;
-            Password = password;
-        }
-
-        public string Username { get; }
-        public string Password { get; }
     }
 }

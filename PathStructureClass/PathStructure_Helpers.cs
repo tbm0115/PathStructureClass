@@ -5,6 +5,9 @@ using System.Text;
 
 namespace PathStructureClass
 {
+    /// <summary>
+    /// Provides shared helper methods for path normalization and logging.
+    /// </summary>
     public static class PathStructure_Helpers
     {
         [DllImport("mpr.dll", CharSet = CharSet.Ansi, EntryPoint = "WNetGetConnectionA")]
@@ -70,9 +73,14 @@ namespace PathStructureClass
             return sFilePath;
         }
 
-        public delegate void PathStructureLogEventHandler(object sender, string message);
-        public static event PathStructureLogEventHandler PathStructureLog;
+        /// <summary>
+        /// Occurs when a log message is emitted by the helpers.
+        /// </summary>
+        public static event EventHandler<string> PathStructureLog;
 
+        /// <summary>
+        /// Emits a log message to any registered listeners.
+        /// </summary>
         public static void Log(string input)
         {
             PathStructureLog?.Invoke(null, input);

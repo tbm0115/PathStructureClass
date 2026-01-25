@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-
 namespace PathStructureClass
 {
     /// <summary>
@@ -13,12 +12,18 @@ namespace PathStructureClass
         private readonly PathStructureConfig _config;
         private readonly IReadOnlyList<IPathValidationRule> _validationRules;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PathStructure"/> class.
+        /// </summary>
         public PathStructure(PathStructureConfig config, IEnumerable<IPathValidationRule> validationRules = null)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _validationRules = (validationRules ?? Array.Empty<IPathValidationRule>()).ToList();
         }
 
+        /// <summary>
+        /// Gets the active configuration.
+        /// </summary>
         public PathStructureConfig Config => _config;
 
         /// <summary>
@@ -53,7 +58,11 @@ namespace PathStructureClass
             return PathValidationResult.Valid(variables, matchTrail);
         }
 
-        private bool TryMatchNode(PathNode node,
+        /// <summary>
+        /// Attempts to match a path segment against the configured node tree.
+        /// </summary>
+        private bool TryMatchNode(
+            PathNode node,
             string remainingPath,
             Dictionary<string, string> variables,
             List<PathMatchNode> matchTrail,
@@ -113,6 +122,9 @@ namespace PathStructureClass
             return false;
         }
 
+        /// <summary>
+        /// Captures named group values into a shared variable dictionary while enforcing consistency.
+        /// </summary>
         private static bool CaptureVariables(Match match, Dictionary<string, string> variables, out string failure)
         {
             failure = null;
@@ -146,81 +158,12 @@ namespace PathStructureClass
             return true;
         }
 
+        /// <summary>
+        /// Normalizes a path for comparisons.
+        /// </summary>
         private static string NormalizePath(string path)
         {
             return path.Trim();
         }
-    }
-
-    public class PathStructureConfig
-    {
-        public PathStructureConfig(PathNode root)
-        {
-            Root = root ?? throw new ArgumentNullException(nameof(root));
-        }
-
-        public PathNode Root { get; }
-        public RegexOptions RegexOptions { get; set; } = RegexOptions.IgnoreCase;
-    }
-
-    public class PathNode
-    {
-        public PathNode(string name, string pattern)
-        {
-            Name = name ?? throw new ArgumentNullException(nameof(name));
-            Pattern = pattern ?? throw new ArgumentNullException(nameof(pattern));
-        }
-
-        public string Name { get; }
-        public string Pattern { get; }
-        public List<PathNode> Children { get; } = new List<PathNode>();
-
-        public Regex GetRegex(RegexOptions options)
-        {
-            return new Regex(Pattern, options | RegexOptions.Compiled);
-        }
-    }
-
-    public class PathMatchNode
-    {
-        public PathMatchNode(PathNode node, string matchedValue)
-        {
-            Node = node ?? throw new ArgumentNullException(nameof(node));
-            MatchedValue = matchedValue;
-        }
-
-        public PathNode Node { get; }
-        public string MatchedValue { get; }
-    }
-
-    public class PathValidationResult
-    {
-        private PathValidationResult(bool isValid, string error, IReadOnlyDictionary<string, string> variables, IReadOnlyList<PathMatchNode> matchTrail)
-        {
-            IsValid = isValid;
-            Error = error;
-            Variables = variables ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            MatchTrail = matchTrail ?? Array.Empty<PathMatchNode>();
-        }
-
-        public bool IsValid { get; }
-        public string Error { get; }
-        public IReadOnlyDictionary<string, string> Variables { get; }
-        public IReadOnlyList<PathMatchNode> MatchTrail { get; }
-
-        public static PathValidationResult Valid(IReadOnlyDictionary<string, string> variables, IReadOnlyList<PathMatchNode> matchTrail)
-        {
-            return new PathValidationResult(true, null, variables, matchTrail);
-        }
-
-        public static PathValidationResult Invalid(string error)
-        {
-            return new PathValidationResult(false, error, null, null);
-        }
-    }
-
-    public interface IPathValidationRule
-    {
-        PathValidationResult Validate(string fullPath, IReadOnlyDictionary<string, string> variables, IReadOnlyList<PathMatchNode> matchTrail);
     }
 }

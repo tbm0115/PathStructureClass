@@ -42,16 +42,28 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ExplorerCredential.cs" />
     <Compile Include="ExplorerWatcher.cs" />
+    <Compile Include="ExplorerWatcherFoundEventArgs.cs" />
+    <Compile Include="ExplorerWatcherFoundEventHandler.cs" />
+    <Compile Include="ExplorerWatcherOptions.cs" />
+    <Compile Include="ICredentialProvider.cs" />
+    <Compile Include="IExplorerWatcherLogger.cs" />
+    <Compile Include="IPathValidationRule.cs" />
     <Compile Include="PathStructure.cs" />
+    <Compile Include="PathStructureConfig.cs" />
     <Compile Include="PathStructureHandler.cs" />
     <Compile Include="PathStructure_Helpers.cs" />
+    <Compile Include="PathMatchNode.cs" />
+    <Compile Include="PathNode.cs" />
+    <Compile Include="PathValidationResult.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <Compile Include="WindowWatch.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">
