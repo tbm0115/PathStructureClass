@@ -1,0 +1,369 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{22C7BAE2-927E-4E90-BD1C-1A5DD27624A7}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <StartupObject>Path_Structure_Maintenance.My.MyApplication</StartupObject>
+    <RootNamespace>Path_Structure_Maintenance</RootNamespace>
+    <AssemblyName>Path Structure Maintenance</AssemblyName>
+    <FileAlignment>512</FileAlignment>
+    <MyType>WindowsForms</MyType>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <PublishUrl>\\server\clientapps\In-House\Path Structure\Publish\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Unc</InstallFrom>
+    <UpdateEnabled>true</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ProductName>Path Structure Maintenance</ProductName>
+    <PublisherName>Irongate Machine Inc</PublisherName>
+    <ApplicationRevision>76</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <PublishWizardCompleted>true</PublishWizardCompleted>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>x86</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DocumentationFile>Path Structure Maintenance.xml</DocumentationFile>
+    <NoWarn>41999,42016,42017,42018,42019,42020,42021,42022,42032,42036</NoWarn>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>
+    </WarningsAsErrors>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <DefineDebug>false</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DocumentationFile>Path Structure Maintenance.xml</DocumentationFile>
+    <NoWarn>41999,42016,42017,42018,42019,42020,42021,42022,42032,42036</NoWarn>
+    <Prefer32Bit>false</Prefer32Bit>
+    <WarningsAsErrors>
+    </WarningsAsErrors>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OptionExplicit>On</OptionExplicit>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OptionCompare>Binary</OptionCompare>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OptionStrict>Off</OptionStrict>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OptionInfer>On</OptionInfer>
+  </PropertyGroup>
+  <PropertyGroup>
+    <TargetZone>Internet</TargetZone>
+  </PropertyGroup>
+  <PropertyGroup>
+    <GenerateManifests>true</GenerateManifests>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationManifest>My Project\app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <PropertyGroup>
+    <SignManifests>true</SignManifests>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>Resources\Optical Object Recognition.ico</ApplicationIcon>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ManifestCertificateThumbprint>3E416281DE67717C79709AAEA5438839F0D351BA</ManifestCertificateThumbprint>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ManifestKeyFile>Path Structure Maintenance_TemporaryKey.pfx</ManifestKeyFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="AxInterop.AcroPDFLib">
+      <HintPath>A:\In-House\Path Structure\AxInterop.AcroPDFLib.dll</HintPath>
+    </Reference>
+    <Reference Include="HTML">
+      <HintPath>..\..\..\HTML Writer\HTML-Writer\HTML Writer\bin\Release\HTML.dll</HintPath>
+    </Reference>
+    <Reference Include="Pather Structure Interface">
+      <HintPath>..\Pather Structure Interface\bin\Debug\Pather Structure Interface.dll</HintPath>
+    </Reference>
+    <Reference Include="PathStructureClass, Version=1.0.5.25, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\PathStructureClass\PathStructureClass\bin\Debug\PathStructureClass.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Deployment" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+  </ItemGroup>
+  <ItemGroup>
+    <Import Include="Microsoft.VisualBasic" />
+    <Import Include="System" />
+    <Import Include="System.Collections" />
+    <Import Include="System.Collections.Generic" />
+    <Import Include="System.Data" />
+    <Import Include="System.Drawing" />
+    <Import Include="System.Diagnostics" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Linq" />
+    <Import Include="System.Xml.Linq" />
+    <Import Include="System.Threading.Tasks" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Dialogs\ExplorerPreview.Designer.vb">
+      <DependentUpon>ExplorerPreview.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Dialogs\ExplorerPreview.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Dialogs\FormatDialog.Designer.vb">
+      <DependentUpon>FormatDialog.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Dialogs\FormatDialog.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Dialogs\Generic Text Dialog.Designer.vb">
+      <DependentUpon>Generic Text Dialog.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Dialogs\Generic Text Dialog.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Dialogs\Select Default Path.Designer.vb">
+      <DependentUpon>Select Default Path.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Dialogs\Select Default Path.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Dialogs\Select File from List.Designer.vb">
+      <DependentUpon>Select File from List.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Dialogs\Select File from List.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Dialogs\SelectFolderDialog.Designer.vb">
+      <DependentUpon>SelectFolderDialog.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Dialogs\SelectFolderDialog.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="GlobalSuppressions.vb" />
+    <Compile Include="Main.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Main.Designer.vb">
+      <DependentUpon>Main.vb</DependentUpon>
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="My Project\AssemblyInfo.vb" />
+    <Compile Include="My Project\Application.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+    <Compile Include="My Project\Resources.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="My Project\Settings.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <Compile Include="Settings.Designer.vb">
+      <DependentUpon>Settings.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Settings.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="User Controls\Add Folder.Designer.vb">
+      <DependentUpon>Add Folder.vb</DependentUpon>
+    </Compile>
+    <Compile Include="User Controls\Add Folder.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="User Controls\FileClipboard.Designer.vb">
+      <DependentUpon>FileClipboard.vb</DependentUpon>
+    </Compile>
+    <Compile Include="User Controls\FileClipboard.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="User Controls\FixAudit.Designer.vb">
+      <DependentUpon>FixAudit.vb</DependentUpon>
+    </Compile>
+    <Compile Include="User Controls\FixAudit.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="User Controls\FolderHeatMap.Designer.vb">
+      <DependentUpon>FolderHeatMap.vb</DependentUpon>
+    </Compile>
+    <Compile Include="User Controls\FolderHeatMap.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="User Controls\FormatItem.Designer.vb">
+      <DependentUpon>FormatItem.vb</DependentUpon>
+    </Compile>
+    <Compile Include="User Controls\FormatItem.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="User Controls\Preview.Designer.vb">
+      <DependentUpon>Preview.vb</DependentUpon>
+    </Compile>
+    <Compile Include="User Controls\Preview.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="User Controls\Transfer_FilesByExtension.Designer.vb">
+      <DependentUpon>Transfer_FilesByExtension.vb</DependentUpon>
+    </Compile>
+    <Compile Include="User Controls\Transfer_FilesByExtension.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="User Controls\Watcher.Designer.vb">
+      <DependentUpon>Watcher.vb</DependentUpon>
+    </Compile>
+    <Compile Include="User Controls\Watcher.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Dialogs\ExplorerPreview.resx">
+      <DependentUpon>ExplorerPreview.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Dialogs\FormatDialog.resx">
+      <DependentUpon>FormatDialog.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Dialogs\Generic Text Dialog.resx">
+      <DependentUpon>Generic Text Dialog.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Dialogs\Select Default Path.resx">
+      <DependentUpon>Select Default Path.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Dialogs\Select File from List.resx">
+      <DependentUpon>Select File from List.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Dialogs\SelectFolderDialog.resx">
+      <DependentUpon>SelectFolderDialog.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Main.resx">
+      <DependentUpon>Main.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="My Project\Resources.resx">
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Settings.resx">
+      <DependentUpon>Settings.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="User Controls\Add Folder.resx">
+      <DependentUpon>Add Folder.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="User Controls\FileClipboard.resx">
+      <DependentUpon>FileClipboard.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="User Controls\FixAudit.resx">
+      <DependentUpon>FixAudit.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="User Controls\FolderHeatMap.resx">
+      <DependentUpon>FolderHeatMap.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="User Controls\FormatItem.resx">
+      <DependentUpon>FormatItem.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="User Controls\Preview.resx">
+      <DependentUpon>Preview.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="User Controls\Transfer_FilesByExtension.resx">
+      <DependentUpon>Transfer_FilesByExtension.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="User Controls\Watcher.resx">
+      <DependentUpon>Watcher.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="My Project\app.manifest" />
+    <None Include="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+    <None Include="My Project\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+    <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Resources\DrawGraph.js" />
+    <Content Include="Resources\ITAR Folder.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <None Include="Resources\Optical Object Recognition.ico" />
+    <None Include="Resources\Path Structure Audit.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <COMReference Include="SHDocVw">
+      <Guid>{EAB22AC0-30C1-11CF-A7EB-0000C05BAE0B}</Guid>
+      <VersionMajor>1</VersionMajor>
+      <VersionMinor>1</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>tlbimp</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
+    <COMReference Include="Shell32">
+      <Guid>{50A7E9B0-70EF-11D1-B75A-00A0C90564FE}</Guid>
+      <VersionMajor>1</VersionMajor>
+      <VersionMinor>0</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>tlbimp</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
+  </ItemGroup>
+  <ItemGroup>
+    <BootstrapperPackage Include=".NETFramework,Version=v4.5">
+      <Visible>False</Visible>
+      <ProductName>Microsoft .NET Framework 4.5 %28x86 and x64%29</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1 Client Profile</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
