@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Represents the result of a path validation attempt.

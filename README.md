@@ -1,6 +1,6 @@
-# PathStructureClass
+# PathStructure
 
-PathStructureClass is a C# library that validates file system paths against a configurable tree of regular-expression nodes and monitors Windows File Explorer selections. It is designed for enterprise environments where path naming conventions must be enforced and where a centralized watcher is needed to capture current Explorer focus and selections.
+PathStructure is a C# library that validates file system paths against a configurable tree of regular-expression nodes and monitors Windows File Explorer selections. It is designed for enterprise environments where path naming conventions must be enforced and where a centralized watcher is needed to capture current Explorer focus and selections.
 
 ## Key Features
 
@@ -14,7 +14,7 @@ PathStructureClass is a C# library that validates file system paths against a co
 ### Configure the Path Structure
 
 ```csharp
-using PathStructureClass;
+using PathStructure;
 
 var root = new PathNode(
     "Root",
@@ -41,7 +41,7 @@ if (!result.IsValid)
 ### Monitor Explorer Windows
 
 ```csharp
-using PathStructureClass;
+using PathStructure;
 
 var watcher = new ExplorerWatcher(pathStructure, new ExplorerWatcherOptions
 {
@@ -61,6 +61,9 @@ watcher.StartWatcher();
 - `PathStructure*` classes define the validation engine and configuration model.
 - `ExplorerWatcher*` classes provide Explorer monitoring and events.
 - `PathStructure_Helpers` includes UNC normalization utilities and logging hooks.
+- `PathStructure.Abstracts` defines plugin contracts and discovery helpers.
+- `ExamplePlugins` includes sample plugin implementations for validation.
+- `PathStructureClient` contains the Electron-based client shell.
 
 ## Notes
 

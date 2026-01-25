@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace PathStructureClass.Properties
+namespace PathStructure.Properties
 {
     using System;
     using System.Globalization;
@@ -33,7 +33,7 @@ namespace PathStructureClass.Properties
             {
                 if (resourceMan == null)
                 {
-                    var temp = new ResourceManager("PathStructureClass.Properties.Resources", typeof(Resources).Assembly);
+                    var temp = new ResourceManager("PathStructure.Properties.Resources", typeof(Resources).Assembly);
                     resourceMan = temp;
                 }
 

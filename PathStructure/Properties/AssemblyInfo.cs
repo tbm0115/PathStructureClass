@@ -1,10 +1,10 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
-[assembly: AssemblyTitle("PathStructureClass")]
+[assembly: AssemblyTitle("PathStructure")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyCompany("LightWorks")]
-[assembly: AssemblyProduct("PathStructureClass")]
+[assembly: AssemblyProduct("PathStructure")]
 [assembly: AssemblyCopyright("Copyright © Trais McAllister 2016")]
 [assembly: AssemblyTrademark("")]
 [assembly: ComVisible(false)]

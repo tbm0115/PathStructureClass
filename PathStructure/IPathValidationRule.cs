@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Defines a custom validation rule for validated paths.

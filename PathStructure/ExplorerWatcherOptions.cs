@@ -1,4 +1,4 @@
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Provides configuration for the explorer watcher.

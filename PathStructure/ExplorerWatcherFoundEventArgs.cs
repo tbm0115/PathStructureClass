@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using SHDocVw;
 
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Tracks the set of watched windows and raises path-change notifications.

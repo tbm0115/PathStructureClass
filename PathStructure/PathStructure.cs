@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Service for validating file system paths against a configured tree of regex-based nodes.

@@ -2,7 +2,7 @@ using System;
 using Shell32;
 using SHDocVw;
 
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Tracks a single explorer window and its current focused path.

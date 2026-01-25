@@ -1,4 +1,4 @@
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Provides credentials for accessing secured resources.

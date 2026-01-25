@@ -1,6 +1,6 @@
 using System;
 
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Captures a node match during validation.
