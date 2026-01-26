@@ -41,3 +41,39 @@ header p {
 ul {
   margin: 12px 0 0 18px;
 }
+
+.watcher-panel {
+  display: grid;
+  gap: 12px;
+}
+
+#watcher-status {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(79, 139, 255, 0.12);
+  border: 1px solid rgba(79, 139, 255, 0.35);
+  font-weight: 600;
+}
+
+#watcher-status[data-connected="false"] {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.event-list li {
+  padding: 8px 10px;
+  background: #111827;
+  border-radius: 8px;
+  border: 1px solid #253045;
+  font-size: 0.9rem;
+  color: #d1d5f1;
+}
