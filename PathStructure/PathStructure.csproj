@@ -1,116 +1,16 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{1D9E4A37-6C0E-44D7-9047-7F0F1F0B6E5A}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>PathStructure</RootNamespace>
     <AssemblyName>PathStructure</AssemblyName>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
-    <TargetFrameworkProfile />
     <LangVersion>latest</LangVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <DefineDebug>true</DefineDebug>
-    <DefineTrace>true</DefineTrace>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DocumentationFile>PathStructure.xml</DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <DefineDebug>false</DefineDebug>
-    <DefineTrace>true</DefineTrace>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DocumentationFile>PathStructure.xml</DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
-  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="HTML">
-      <HintPath>..\..\HTML Writer\HTML-Writer\HTML Writer\bin\Release\HTML.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Buffers">
-      <HintPath>..\\packages\\System.Buffers.4.5.1\\lib\\net461\\System.Buffers.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Memory">
-      <HintPath>..\\packages\\System.Memory.4.5.5\\lib\\net461\\System.Memory.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Numerics.Vectors">
-      <HintPath>..\\packages\\System.Numerics.Vectors.4.5.0\\lib\\net46\\System.Numerics.Vectors.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe">
-      <HintPath>..\\packages\\System.Runtime.CompilerServices.Unsafe.6.0.0\\lib\\net461\\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Text.Json">
-      <HintPath>..\\packages\\System.Text.Json.7.0.2\\lib\\net462\\System.Text.Json.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Windows.Forms" />
-    <Reference Include="System.Xml" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="ExplorerCredential.cs" />
-    <Compile Include="ExplorerWatcher.cs" />
-    <Compile Include="ExplorerWatcherFoundEventArgs.cs" />
-    <Compile Include="ExplorerWatcherFoundEventHandler.cs" />
-    <Compile Include="ExplorerWatcherOptions.cs" />
-    <Compile Include="ICredentialProvider.cs" />
-    <Compile Include="IExplorerWatcherLogger.cs" />
-    <Compile Include="PathStructureConfigLoader.cs" />
-    <Compile Include="PathStructure.cs" />
-    <Compile Include="PathStructureConfig.cs" />
-    <Compile Include="PathStructureHandler.cs" />
-    <Compile Include="PathStructure_Helpers.cs" />
-    <Compile Include="PathStructureImport.cs" />
-    <Compile Include="PathStructurePath.cs" />
-    <Compile Include="PathStructurePlugin.cs" />
-    <Compile Include="PathMatchNode.cs" />
-    <Compile Include="PathNode.cs" />
-    <Compile Include="PathValidationResult.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Properties\Resources.Designer.cs">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
-    <Compile Include="WindowWatch.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="FileSystemVisualAuditTemplate.html" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\PathStructure.Abstracts\PathStructure.Abstracts.csproj">
-      <Project>{C6D3E799-1B01-4FD8-B4C0-90A4A11D8CF6}</Project>
-      <Name>PathStructure.Abstracts</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <COMReference Include="DSOFile">
-      <Guid>{58968145-CF00-4341-995F-2EE093F6ABA3}</Guid>
-      <VersionMajor>2</VersionMajor>
-      <VersionMinor>1</VersionMinor>
-      <Lcid>0</Lcid>
-      <WrapperTool>tlbimp</WrapperTool>
-      <Isolated>False</Isolated>
-      <EmbedInteropTypes>True</EmbedInteropTypes>
-    </COMReference>
     <COMReference Include="SHDocVw">
       <Guid>{EAB22AC0-30C1-11CF-A7EB-0000C05BAE0B}</Guid>
       <VersionMajor>1</VersionMajor>
@@ -130,5 +30,27 @@
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </COMReference>
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="FileSystemVisualAuditTemplate.html" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\\PathStructure.Abstracts\\PathStructure.Abstracts.csproj" />
+  </ItemGroup>
 </Project>
