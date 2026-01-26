@@ -1,5 +1,4 @@
 using System;
-using System.Windows.Forms;
 
 namespace PathStructure.Abstracts
 {
@@ -12,7 +11,6 @@ namespace PathStructure.Abstracts
         string Description { get; }
         string Suite { get; }
         IPathStructure ReferenceStructure { get; set; }
-        Keys ShortcutKeys { get; }
 
         void Run();
         void ChangedCurrentPath(string currentPath);

@@ -1,5 +1,4 @@
 using System;
-using System.Windows.Forms;
 using PathStructure.Abstracts;
 
 namespace PathStructure.ExamplePlugins
@@ -16,8 +15,6 @@ namespace PathStructure.ExamplePlugins
         public string Suite => "Example";
 
         public IPathStructure ReferenceStructure { get; set; }
-
-        public Keys ShortcutKeys => Keys.Control | Keys.Shift | Keys.E;
 
         public event EventHandler<PathEventArgs> SetCurrentPath;
         public event EventHandler<PathEventArgs> GetCurrentPath;
