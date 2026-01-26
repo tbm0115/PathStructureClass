@@ -78,7 +78,7 @@ namespace PathStructure
                 return false;
             }
 
-            if (!CaptureVariables(match, variables, out failure))
+            if (!CaptureVariables(match, match.Regex.GetGroupNames(), variables, out failure))
             {
                 return false;
             }
@@ -120,10 +120,14 @@ namespace PathStructure
         /// <summary>
         /// Captures named group values into a shared variable dictionary while enforcing consistency.
         /// </summary>
-        private static bool CaptureVariables(Match match, Dictionary<string, string> variables, out string failure)
+        private static bool CaptureVariables(
+            Match match,
+            IEnumerable<string> groupNames,
+            Dictionary<string, string> variables,
+            out string failure)
         {
             failure = null;
-            foreach (var groupName in match.Regex.GetGroupNames())
+            foreach (var groupName in groupNames ?? Enumerable.Empty<string>())
             {
                 if (int.TryParse(groupName, out _))
                 {
