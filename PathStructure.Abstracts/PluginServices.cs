@@ -37,7 +37,7 @@ namespace PathStructure.Abstracts
 
             if (!Directory.Exists(directory))
             {
-                return Array.Empty<AvailablePlugin>();
+                return Enumerable.Empty<AvailablePlugin>().ToArray();
             }
 
             var plugins = new List<AvailablePlugin>();

@@ -1,6 +1,5 @@
 using System;
 using System.Windows.Forms;
-using PathStructure;
 
 namespace PathStructure.Abstracts
 {
@@ -12,7 +11,7 @@ namespace PathStructure.Abstracts
         string Name { get; }
         string Description { get; }
         string Suite { get; }
-        PathStructure.PathStructure ReferenceStructure { get; set; }
+        IPathStructure ReferenceStructure { get; set; }
         Keys ShortcutKeys { get; }
 
         void Run();

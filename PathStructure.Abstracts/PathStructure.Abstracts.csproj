@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props)'" />
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -35,16 +35,16 @@
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="IPathMatchNode.cs" />
+    <Compile Include="IPathNode.cs" />
+    <Compile Include="IPathStructure.cs" />
+    <Compile Include="IPathStructureConfig.cs" />
+    <Compile Include="IPathValidationResult.cs" />
+    <Compile Include="IPathValidationRule.cs" />
     <Compile Include="IWatcherPlugin.cs" />
     <Compile Include="PathEventArgs.cs" />
     <Compile Include="PluginServices.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\PathStructure\PathStructure.csproj">
-      <Project>{1D9E4A37-6C0E-44D7-9047-7F0F1F0B6E5A}</Project>
-      <Name>PathStructure</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

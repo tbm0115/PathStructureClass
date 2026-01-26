@@ -15,7 +15,7 @@ namespace PathStructure.ExamplePlugins
 
         public string Suite => "Example";
 
-        public PathStructure.PathStructure ReferenceStructure { get; set; }
+        public IPathStructure ReferenceStructure { get; set; }
 
         public Keys ShortcutKeys => Keys.Control | Keys.Shift | Keys.E;
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props)" />
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -49,7 +49,6 @@
     <Compile Include="ExplorerWatcherOptions.cs" />
     <Compile Include="ICredentialProvider.cs" />
     <Compile Include="IExplorerWatcherLogger.cs" />
-    <Compile Include="IPathValidationRule.cs" />
     <Compile Include="PathStructure.cs" />
     <Compile Include="PathStructureConfig.cs" />
     <Compile Include="PathStructureHandler.cs" />
@@ -76,6 +75,12 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="FileSystemVisualAuditTemplate.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PathStructure.Abstracts\PathStructure.Abstracts.csproj">
+      <Project>{C6D3E799-1B01-4FD8-B4C0-90A4A11D8CF6}</Project>
+      <Name>PathStructure.Abstracts</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <COMReference Include="DSOFile">

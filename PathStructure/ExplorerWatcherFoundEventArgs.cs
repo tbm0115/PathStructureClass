@@ -10,6 +10,7 @@ namespace PathStructure
     public class ExplorerWatcherFoundEventArgs
     {
         private List<WindowWatch> _wins;
+        private static int NormalizeHandle(long windowHandle) => unchecked((int)windowHandle);
 
         /// <summary>
         /// Occurs when a watched window changes its path.
@@ -52,15 +53,16 @@ namespace PathStructure
                 _wins = new List<WindowWatch>();
             }
 
-            if (!Contains(windowObject.HWND))
+            var windowHandle = NormalizeHandle(windowObject.HWND);
+            if (!Contains(windowHandle))
             {
                 _wins.Add(new WindowWatch(windowObject));
             }
             else
             {
-                if (_wins[IndexOf(windowObject.HWND)].CheckWindow(windowObject))
+                if (_wins[IndexOf(windowHandle)].CheckWindow(windowObject))
                 {
-                    PathChanged?.Invoke(_wins[IndexOf(windowObject.HWND)].URL);
+                    PathChanged?.Invoke(_wins[IndexOf(windowHandle)].URL);
                 }
             }
         }
@@ -70,11 +72,12 @@ namespace PathStructure
         /// </summary>
         public void Check(ShellBrowserWindow windowObject)
         {
-            if (Contains(windowObject.HWND))
+            var windowHandle = NormalizeHandle(windowObject.HWND);
+            if (Contains(windowHandle))
             {
-                if (_wins[IndexOf(windowObject.HWND)].CheckWindow(windowObject))
+                if (_wins[IndexOf(windowHandle)].CheckWindow(windowObject))
                 {
-                    PathChanged?.Invoke(_wins[IndexOf(windowObject.HWND)].URL);
+                    PathChanged?.Invoke(_wins[IndexOf(windowHandle)].URL);
                 }
             }
         }
@@ -120,9 +123,10 @@ namespace PathStructure
         /// </summary>
         private void RemoveWindow(ShellBrowserWindow hWindow, EventArgs e)
         {
-            if (Contains(hWindow.HWND))
+            var windowHandle = NormalizeHandle(hWindow.HWND);
+            if (Contains(windowHandle))
             {
-                RemoveAt(IndexOf(hWindow.HWND));
+                RemoveAt(IndexOf(windowHandle));
             }
         }
 
@@ -132,6 +136,14 @@ namespace PathStructure
         public bool Contains(int windowHandle)
         {
             return IndexOf(windowHandle) >= 0;
+        }
+
+        /// <summary>
+        /// Determines whether the specified handle is being tracked.
+        /// </summary>
+        public bool Contains(long windowHandle)
+        {
+            return Contains(NormalizeHandle(windowHandle));
         }
 
         /// <summary>
@@ -151,6 +163,14 @@ namespace PathStructure
             }
 
             return -1;
+        }
+
+        /// <summary>
+        /// Gets the index of a tracked window handle.
+        /// </summary>
+        public int IndexOf(long windowHandle)
+        {
+            return IndexOf(NormalizeHandle(windowHandle));
         }
     }
 }
