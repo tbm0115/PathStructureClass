@@ -1,0 +1,43 @@
+:root {
+  color-scheme: light dark;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #0e1116;
+  color: #f3f4f6;
+}
+
+main {
+  padding: 32px;
+  display: grid;
+  gap: 24px;
+}
+
+header h1 {
+  margin: 0 0 8px;
+  font-size: 2rem;
+}
+
+header p {
+  margin: 0;
+  color: #cbd5f5;
+}
+
+.panel {
+  background: #161b22;
+  border: 1px solid #253045;
+  border-radius: 12px;
+  padding: 20px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.panel.active {
+  transform: translateY(-2px);
+  border-color: #4f8bff;
+}
+
+ul {
+  margin: 12px 0 0 18px;
+}

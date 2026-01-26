@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Represents a single node in the configured path structure tree.

@@ -1,7 +1,7 @@
 using System;
 using System.Text.RegularExpressions;
 
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Represents configuration for the path structure service.

@@ -3,7 +3,7 @@ using System.Timers;
 using Shell32;
 using SHDocVw;
 
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Uses Shell to get the users selection(s) within Windows Explorer/Internet Explorer.

@@ -1,6 +1,6 @@
 using System;
 
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Defines logging behavior for explorer watcher errors.

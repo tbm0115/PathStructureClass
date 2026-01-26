@@ -3,7 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Provides shared helper methods for path normalization and logging.

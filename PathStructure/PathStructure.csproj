@@ -6,8 +6,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{1D9E4A37-6C0E-44D7-9047-7F0F1F0B6E5A}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>PathStructureClass</RootNamespace>
-    <AssemblyName>PathStructureClass</AssemblyName>
+    <RootNamespace>PathStructure</RootNamespace>
+    <AssemblyName>PathStructure</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <TargetFrameworkProfile />
@@ -19,7 +19,7 @@
     <DefineDebug>true</DefineDebug>
     <DefineTrace>true</DefineTrace>
     <OutputPath>bin\Debug\</OutputPath>
-    <DocumentationFile>PathStructureClass.xml</DocumentationFile>
+    <DocumentationFile>PathStructure.xml</DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -28,7 +28,7 @@
     <DefineTrace>true</DefineTrace>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DocumentationFile>PathStructureClass.xml</DocumentationFile>
+    <DocumentationFile>PathStructure.xml</DocumentationFile>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>

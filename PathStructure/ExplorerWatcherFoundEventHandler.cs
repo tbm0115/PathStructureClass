@@ -1,4 +1,4 @@
-namespace PathStructureClass
+namespace PathStructure
 {
     /// <summary>
     /// Represents a handler for explorer watcher path notifications.
