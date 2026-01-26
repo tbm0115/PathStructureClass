@@ -12,6 +12,7 @@ namespace PathStructure
         private ShellBrowserWindow _win;
         private string _path;
         private readonly int _handle;
+        private static int NormalizeHandle(long windowHandle) => unchecked((int)windowHandle);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="WindowWatch"/> class.
@@ -19,7 +20,7 @@ namespace PathStructure
         public WindowWatch(ShellBrowserWindow hWindow)
         {
             _win = hWindow;
-            _handle = hWindow.HWND;
+            _handle = NormalizeHandle(hWindow.HWND);
             CheckWindow(hWindow);
         }
 

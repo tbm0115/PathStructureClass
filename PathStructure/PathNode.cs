@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using PathStructure.Abstracts;
 
 namespace PathStructure
 {
-    /// <summary>
-    /// Represents a single node in the configured path structure tree.
-    /// </summary>
-    public class PathNode
+    /// <inheritdoc />
+    public class PathNode : IPathNode
     {
+        private readonly List<IPathNode> _children = new List<IPathNode>();
+
         /// <summary>
         /// Initializes a new instance of the <see cref="PathNode"/> class.
         /// </summary>
@@ -18,24 +19,21 @@ namespace PathStructure
             Pattern = pattern ?? throw new ArgumentNullException(nameof(pattern));
         }
 
-        /// <summary>
-        /// Gets the display name for the node.
-        /// </summary>
+        /// <inheritdoc />
         public string Name { get; }
 
-        /// <summary>
-        /// Gets the regex pattern for this node.
-        /// </summary>
+        /// <inheritdoc />
         public string Pattern { get; }
 
         /// <summary>
         /// Gets the child nodes for this node.
         /// </summary>
-        public List<PathNode> Children { get; } = new List<PathNode>();
+        public IList<IPathNode> Children => _children;
 
-        /// <summary>
-        /// Builds a regex for the node using the provided options.
-        /// </summary>
+        /// <inheritdoc />
+        IReadOnlyList<IPathNode> IPathNode.Children => _children;
+
+        /// <inheritdoc />
         public Regex GetRegex(RegexOptions options)
         {
             return new Regex(Pattern, options | RegexOptions.Compiled);

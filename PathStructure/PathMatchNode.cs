@@ -1,29 +1,24 @@
 using System;
+using PathStructure.Abstracts;
 
 namespace PathStructure
 {
-    /// <summary>
-    /// Captures a node match during validation.
-    /// </summary>
-    public class PathMatchNode
+    /// <inheritdoc />
+    public class PathMatchNode : IPathMatchNode
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="PathMatchNode"/> class.
         /// </summary>
-        public PathMatchNode(PathNode node, string matchedValue)
+        public PathMatchNode(IPathNode node, string matchedValue)
         {
             Node = node ?? throw new ArgumentNullException(nameof(node));
             MatchedValue = matchedValue;
         }
 
-        /// <summary>
-        /// Gets the matched configuration node.
-        /// </summary>
-        public PathNode Node { get; }
+        /// <inheritdoc />
+        public IPathNode Node { get; }
 
-        /// <summary>
-        /// Gets the matched substring for the node.
-        /// </summary>
+        /// <inheritdoc />
         public string MatchedValue { get; }
     }
 }
