@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Timers;
 using Shell32;
 using SHDocVw;
@@ -15,6 +16,7 @@ namespace PathStructure
         private readonly Timer _watcher;
         private bool _cancel;
         private ExplorerWatcherFoundEventArgs _evt;
+        private int _isPolling;
 
         /// <summary>
         /// Gets the current snapshot of watched windows.
@@ -93,6 +95,44 @@ namespace PathStructure
         /// Performs a poll of open shell windows.
         /// </summary>
         private void ExplorerQuery()
+        {
+            if (Interlocked.CompareExchange(ref _isPolling, 1, 0) != 0)
+            {
+                return;
+            }
+
+            if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA)
+            {
+                var staThread = new Thread(() =>
+                {
+                    try
+                    {
+                        ExplorerQueryInternal();
+                    }
+                    finally
+                    {
+                        Interlocked.Exchange(ref _isPolling, 0);
+                    }
+                })
+                {
+                    IsBackground = true
+                };
+                staThread.SetApartmentState(ApartmentState.STA);
+                staThread.Start();
+                return;
+            }
+
+            try
+            {
+                ExplorerQueryInternal();
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _isPolling, 0);
+            }
+        }
+
+        private void ExplorerQueryInternal()
         {
             var exShell = new Shell();
             if (_evt == null)
