@@ -26,6 +26,14 @@
         <h2>Plugin pipeline</h2>
         <p>Plugins are discovered from configured folders and executed alongside the watcher UI.</p>
       </section>
+
+      <section class="panel watcher-panel">
+        <h2>Explorer watcher</h2>
+        <p id="watcher-status" data-connected="false">Waiting for watcher host...</p>
+        <ul id="watcher-events" class="event-list">
+          <li>Explorer events will appear here once connected.</li>
+        </ul>
+      </section>
     </main>
     <script src="renderer.js"></script>
   </body>
