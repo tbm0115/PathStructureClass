@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -21,9 +22,17 @@ namespace PathStructure.WatcherHost
         private static void Main(string[] args)
         {
             var port = DefaultPort;
-            if (args.Length > 0 && int.TryParse(args[0], out var parsedPort))
+            string configPath = null;
+            foreach (var arg in args)
             {
-                port = parsedPort;
+                if (port == DefaultPort && int.TryParse(arg, out var parsedPort))
+                {
+                    port = parsedPort;
+                }
+                else if (configPath == null)
+                {
+                    configPath = arg;
+                }
             }
 
             Console.WriteLine($"Starting PathStructure.WatcherHost on port {port}.");
@@ -36,14 +45,24 @@ namespace PathStructure.WatcherHost
 
             AppDomain.CurrentDomain.ProcessExit += (sender, eventArgs) => Stop();
 
-            StartWatcher();
+            StartWatcher(configPath);
             StartServerAsync(port, _cts.Token).GetAwaiter().GetResult();
         }
 
-        private static void StartWatcher()
+        private static void StartWatcher(string configPath)
         {
-            var rootNode = new PathNode("Root", @"^.*$");
-            var config = new PathStructureConfig(rootNode);
+            PathStructureConfig config;
+            if (!string.IsNullOrWhiteSpace(configPath))
+            {
+                var resolvedPath = Path.GetFullPath(configPath);
+                Console.WriteLine($"Loading configuration from {resolvedPath}.");
+                config = PathStructureConfigLoader.LoadFromFile(resolvedPath);
+            }
+            else
+            {
+                var rootNode = new PathNode("Root", @"^.*$");
+                config = new PathStructureConfig(rootNode);
+            }
             var pathStructure = new PathStructure(config);
 
             _watcher = new ExplorerWatcher(pathStructure, new ExplorerWatcherOptions

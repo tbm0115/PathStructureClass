@@ -1,50 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{C6D3E799-1B01-4FD8-B4C0-90A4A11D8CF6}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+	<OutputType>Library</OutputType>
     <RootNamespace>PathStructure.Abstracts</RootNamespace>
     <AssemblyName>PathStructure.Abstracts</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
     <LangVersion>latest</LangVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <DefineDebug>true</DefineDebug>
-    <DefineTrace>true</DefineTrace>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DocumentationFile>PathStructure.Abstracts.xml</DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <DefineDebug>false</DefineDebug>
-    <DefineTrace>true</DefineTrace>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DocumentationFile>PathStructure.Abstracts.xml</DocumentationFile>
-    <Prefer32Bit>false</Prefer32Bit>
-  </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Windows.Forms" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="IPathMatchNode.cs" />
-    <Compile Include="IPathNode.cs" />
-    <Compile Include="IPathStructure.cs" />
-    <Compile Include="IPathStructureConfig.cs" />
-    <Compile Include="IPathValidationResult.cs" />
-    <Compile Include="IPathValidationRule.cs" />
-    <Compile Include="IWatcherPlugin.cs" />
-    <Compile Include="PathEventArgs.cs" />
-    <Compile Include="PluginServices.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

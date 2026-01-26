@@ -14,9 +14,27 @@ namespace PathStructure
         /// Initializes a new instance of the <see cref="PathNode"/> class.
         /// </summary>
         public PathNode(string name, string pattern)
+            : this(name, pattern, null, null, null, null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PathNode"/> class with metadata.
+        /// </summary>
+        public PathNode(
+            string name,
+            string pattern,
+            string flavorTextTemplate,
+            string backgroundColor,
+            string foregroundColor,
+            string icon)
         {
             Name = name ?? throw new ArgumentNullException(nameof(name));
             Pattern = pattern ?? throw new ArgumentNullException(nameof(pattern));
+            FlavorTextTemplate = flavorTextTemplate;
+            BackgroundColor = backgroundColor;
+            ForegroundColor = foregroundColor;
+            Icon = icon;
         }
 
         /// <inheritdoc />
@@ -24,6 +42,26 @@ namespace PathStructure
 
         /// <inheritdoc />
         public string Pattern { get; }
+
+        /// <summary>
+        /// Gets the flavor text template associated with this node.
+        /// </summary>
+        public string FlavorTextTemplate { get; }
+
+        /// <summary>
+        /// Gets the background color associated with this node.
+        /// </summary>
+        public string BackgroundColor { get; }
+
+        /// <summary>
+        /// Gets the foreground color associated with this node.
+        /// </summary>
+        public string ForegroundColor { get; }
+
+        /// <summary>
+        /// Gets the icon path associated with this node.
+        /// </summary>
+        public string Icon { get; }
 
         /// <summary>
         /// Gets the child nodes for this node.
