@@ -354,7 +354,7 @@ namespace PathStructure.WatcherHost
                     continue;
                 }
 
-                matches.Add(new PathPatternMatch(node.Pattern, match.Value, match.Value.Length));
+                matches.Add(new PathPatternMatch(node.Name, node.Pattern, match.Value, match.Value.Length));
             }
 
             if (matches.Count == 0)
@@ -429,7 +429,7 @@ namespace PathStructure.WatcherHost
 
         private static string FormatMatches(IEnumerable<PathPatternMatch> matches)
         {
-            return string.Join(", ", matches.Select(match => $"{match.Pattern} (match: {match.MatchedValue})"));
+            return string.Join(", ", matches.Select(match => $"{match.NodeName}: {match.Pattern} (match: {match.MatchedValue})"));
         }
 #endif
 
@@ -472,13 +472,15 @@ namespace PathStructure.WatcherHost
 
         private readonly struct PathPatternMatch
         {
-            public PathPatternMatch(string pattern, string matchedValue, int matchLength)
+            public PathPatternMatch(string nodeName, string pattern, string matchedValue, int matchLength)
             {
+                NodeName = nodeName;
                 Pattern = pattern;
                 MatchedValue = matchedValue;
                 MatchLength = matchLength;
             }
 
+            public string NodeName { get; }
             public string Pattern { get; }
             public string MatchedValue { get; }
             public int MatchLength { get; }
