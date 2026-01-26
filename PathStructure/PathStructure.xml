@@ -1,0 +1,358 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>PathStructure</name>
+    </assembly>
+    <members>
+        <member name="T:PathStructure.ExplorerCredential">
+            <summary>
+            Represents credentials for accessing secured resources.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerCredential.#ctor(System.String,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:PathStructure.ExplorerCredential"/> class.
+            </summary>
+        </member>
+        <member name="P:PathStructure.ExplorerCredential.Username">
+            <summary>
+            Gets the username for the credential.
+            </summary>
+        </member>
+        <member name="P:PathStructure.ExplorerCredential.Password">
+            <summary>
+            Gets the password for the credential.
+            </summary>
+        </member>
+        <member name="T:PathStructure.ExplorerWatcher">
+            <summary>
+            Uses Shell to get the users selection(s) within Windows Explorer/Internet Explorer.
+            </summary>
+        </member>
+        <member name="P:PathStructure.ExplorerWatcher.CurrentFoundPaths">
+            <summary>
+            Gets the current snapshot of watched windows.
+            </summary>
+        </member>
+        <member name="E:PathStructure.ExplorerWatcher.ExplorerWatcherFound">
+            <summary>
+            Occurs when a watched window's path changes.
+            </summary>
+        </member>
+        <member name="E:PathStructure.ExplorerWatcher.ExplorerWatcherAborted">
+            <summary>
+            Occurs when the watcher stops unexpectedly.
+            </summary>
+        </member>
+        <member name="E:PathStructure.ExplorerWatcher.ExplorerWatcherError">
+            <summary>
+            Occurs when an error is encountered while polling windows.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcher.#ctor(PathStructure.PathStructure,PathStructure.ExplorerWatcherOptions)">
+            <summary>
+            Initializes a new instance of the <see cref="T:PathStructure.ExplorerWatcher"/> class.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcher.StartWatcher">
+            <summary>
+            Begins polling Shell for current contexts of Windows Explorer/Internet Explorer.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcher.StopWatcher">
+            <summary>
+            Requests that the polling abort.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcher.WindowPathChanged(System.String)">
+            <summary>
+            Relays path updates to the external event.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcher.ExplorerQuery(System.Object,System.Timers.ElapsedEventArgs)">
+            <summary>
+            Handles timer events for polling.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcher.ExplorerQuery">
+            <summary>
+            Performs a poll of open shell windows.
+            </summary>
+        </member>
+        <member name="T:PathStructure.ExplorerWatcherFoundEventArgs">
+            <summary>
+            Tracks the set of watched windows and raises path-change notifications.
+            </summary>
+        </member>
+        <member name="E:PathStructure.ExplorerWatcherFoundEventArgs.PathChanged">
+            <summary>
+            Occurs when a watched window changes its path.
+            </summary>
+        </member>
+        <member name="P:PathStructure.ExplorerWatcherFoundEventArgs.Item(System.Int32)">
+            <summary>
+            Gets or sets a tracked window by index.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcherFoundEventArgs.Add(SHDocVw.ShellBrowserWindow)">
+            <summary>
+            Adds a window to the tracking set.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcherFoundEventArgs.Check(SHDocVw.ShellBrowserWindow)">
+            <summary>
+            Checks a window for a path change.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcherFoundEventArgs.Remove(PathStructure.WindowWatch)">
+            <summary>
+            Removes a window from tracking.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcherFoundEventArgs.RemoveAt(System.Int32)">
+            <summary>
+            Removes a window from tracking by index.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcherFoundEventArgs.ChildPathChanged(System.String,System.EventArgs)">
+            <summary>
+            Relays path changes from child watchers.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcherFoundEventArgs.RemoveWindow(SHDocVw.ShellBrowserWindow,System.EventArgs)">
+            <summary>
+            Removes a window when it is closed.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcherFoundEventArgs.Contains(System.Int32)">
+            <summary>
+            Determines whether the specified handle is being tracked.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcherFoundEventArgs.Contains(System.Int64)">
+            <summary>
+            Determines whether the specified handle is being tracked.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcherFoundEventArgs.IndexOf(System.Int32)">
+            <summary>
+            Gets the index of a tracked window handle.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ExplorerWatcherFoundEventArgs.IndexOf(System.Int64)">
+            <summary>
+            Gets the index of a tracked window handle.
+            </summary>
+        </member>
+        <member name="T:PathStructure.ExplorerWatcherFoundEventHandler">
+            <summary>
+            Represents a handler for explorer watcher path notifications.
+            </summary>
+        </member>
+        <member name="T:PathStructure.ExplorerWatcherOptions">
+            <summary>
+            Provides configuration for the explorer watcher.
+            </summary>
+        </member>
+        <member name="P:PathStructure.ExplorerWatcherOptions.PollRateMs">
+            <summary>
+            Gets or sets the polling interval in milliseconds.
+            </summary>
+        </member>
+        <member name="P:PathStructure.ExplorerWatcherOptions.Logger">
+            <summary>
+            Gets or sets the logger used for watcher errors.
+            </summary>
+        </member>
+        <member name="P:PathStructure.ExplorerWatcherOptions.CredentialProvider">
+            <summary>
+            Gets or sets the credential provider for secured resources.
+            </summary>
+        </member>
+        <member name="T:PathStructure.ICredentialProvider">
+            <summary>
+            Provides credentials for accessing secured resources.
+            </summary>
+        </member>
+        <member name="M:PathStructure.ICredentialProvider.TryGetCredential(System.String,PathStructure.ExplorerCredential@)">
+            <summary>
+            Attempts to retrieve credentials for a target resource.
+            </summary>
+        </member>
+        <member name="T:PathStructure.IExplorerWatcherLogger">
+            <summary>
+            Defines logging behavior for explorer watcher errors.
+            </summary>
+        </member>
+        <member name="M:PathStructure.IExplorerWatcherLogger.LogError(System.String,System.Exception)">
+            <summary>
+            Logs an error encountered by the watcher.
+            </summary>
+        </member>
+        <member name="T:PathStructure.PathStructure">
+            <inheritdoc />
+        </member>
+        <member name="M:PathStructure.PathStructure.#ctor(PathStructure.Abstracts.IPathStructureConfig,System.Collections.Generic.IEnumerable{PathStructure.Abstracts.IPathValidationRule})">
+            <summary>
+            Initializes a new instance of the <see cref="T:PathStructure.PathStructure"/> class.
+            </summary>
+        </member>
+        <member name="P:PathStructure.PathStructure.Config">
+            <inheritdoc />
+        </member>
+        <member name="M:PathStructure.PathStructure.ValidatePath(System.String)">
+            <inheritdoc />
+        </member>
+        <member name="M:PathStructure.PathStructure.TryMatchNode(PathStructure.Abstracts.IPathNode,System.String,System.Collections.Generic.Dictionary{System.String,System.String},System.Collections.Generic.List{PathStructure.Abstracts.IPathMatchNode},System.String@)">
+            <summary>
+            Attempts to match a path segment against the configured node tree.
+            </summary>
+        </member>
+        <member name="M:PathStructure.PathStructure.CaptureVariables(System.Text.RegularExpressions.Match,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.Dictionary{System.String,System.String},System.String@)">
+            <summary>
+            Captures named group values into a shared variable dictionary while enforcing consistency.
+            </summary>
+        </member>
+        <member name="M:PathStructure.PathStructure.NormalizePath(System.String)">
+            <summary>
+            Normalizes a path for comparisons.
+            </summary>
+        </member>
+        <member name="T:PathStructure.PathStructureConfig">
+            <inheritdoc />
+        </member>
+        <member name="M:PathStructure.PathStructureConfig.#ctor(PathStructure.Abstracts.IPathNode)">
+            <inheritdoc />
+        </member>
+        <member name="P:PathStructure.PathStructureConfig.Root">
+            <inheritdoc />
+        </member>
+        <member name="P:PathStructure.PathStructureConfig.RegexOptions">
+            <inheritdoc />
+        </member>
+        <member name="T:PathStructure.PathStructureHandler">
+            <summary>
+            Placeholder handler for future path structure operations.
+            </summary>
+        </member>
+        <member name="T:PathStructure.PathStructure_Helpers">
+            <summary>
+            Provides shared helper methods for path normalization and logging.
+            </summary>
+        </member>
+        <member name="M:PathStructure.PathStructure_Helpers.GetUNCPath(System.String)">
+            <summary>
+            Gets the UNC representation of the provided path.
+            </summary>
+        </member>
+        <member name="E:PathStructure.PathStructure_Helpers.PathStructureLog">
+            <summary>
+            Occurs when a log message is emitted by the helpers.
+            </summary>
+        </member>
+        <member name="M:PathStructure.PathStructure_Helpers.Log(System.String)">
+            <summary>
+            Emits a log message to any registered listeners.
+            </summary>
+        </member>
+        <member name="T:PathStructure.PathMatchNode">
+            <inheritdoc />
+        </member>
+        <member name="M:PathStructure.PathMatchNode.#ctor(PathStructure.Abstracts.IPathNode,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:PathStructure.PathMatchNode"/> class.
+            </summary>
+        </member>
+        <member name="P:PathStructure.PathMatchNode.Node">
+            <inheritdoc />
+        </member>
+        <member name="P:PathStructure.PathMatchNode.MatchedValue">
+            <inheritdoc />
+        </member>
+        <member name="T:PathStructure.PathNode">
+            <inheritdoc />
+        </member>
+        <member name="M:PathStructure.PathNode.#ctor(System.String,System.String)">
+            <summary>
+            Initializes a new instance of the <see cref="T:PathStructure.PathNode"/> class.
+            </summary>
+        </member>
+        <member name="P:PathStructure.PathNode.Name">
+            <inheritdoc />
+        </member>
+        <member name="P:PathStructure.PathNode.Pattern">
+            <inheritdoc />
+        </member>
+        <member name="P:PathStructure.PathNode.Children">
+            <summary>
+            Gets the child nodes for this node.
+            </summary>
+        </member>
+        <member name="P:PathStructure.PathNode.PathStructure#Abstracts#IPathNode#Children">
+            <inheritdoc />
+        </member>
+        <member name="M:PathStructure.PathNode.GetRegex(System.Text.RegularExpressions.RegexOptions)">
+            <inheritdoc />
+        </member>
+        <member name="T:PathStructure.PathValidationResult">
+            <inheritdoc />
+        </member>
+        <member name="M:PathStructure.PathValidationResult.#ctor(System.Boolean,System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.Collections.Generic.IReadOnlyList{PathStructure.Abstracts.IPathMatchNode})">
+            <summary>
+            Initializes a new instance of the <see cref="T:PathStructure.PathValidationResult"/> class.
+            </summary>
+        </member>
+        <member name="P:PathStructure.PathValidationResult.IsValid">
+            <inheritdoc />
+        </member>
+        <member name="P:PathStructure.PathValidationResult.Error">
+            <inheritdoc />
+        </member>
+        <member name="P:PathStructure.PathValidationResult.Variables">
+            <inheritdoc />
+        </member>
+        <member name="P:PathStructure.PathValidationResult.MatchTrail">
+            <inheritdoc />
+        </member>
+        <member name="M:PathStructure.PathValidationResult.Valid(System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.Collections.Generic.IReadOnlyList{PathStructure.Abstracts.IPathMatchNode})">
+            <summary>
+            Creates a successful validation result.
+            </summary>
+        </member>
+        <member name="M:PathStructure.PathValidationResult.Invalid(System.String)">
+            <summary>
+            Creates a failed validation result.
+            </summary>
+        </member>
+        <member name="T:PathStructure.WindowWatch">
+            <summary>
+            Tracks a single explorer window and its current focused path.
+            </summary>
+        </member>
+        <member name="M:PathStructure.WindowWatch.#ctor(SHDocVw.ShellBrowserWindow)">
+            <summary>
+            Initializes a new instance of the <see cref="T:PathStructure.WindowWatch"/> class.
+            </summary>
+        </member>
+        <member name="P:PathStructure.WindowWatch.URL">
+            <summary>
+            Gets the current window URL.
+            </summary>
+        </member>
+        <member name="P:PathStructure.WindowWatch.Window">
+            <summary>
+            Gets or sets the underlying shell window.
+            </summary>
+        </member>
+        <member name="P:PathStructure.WindowWatch.WindowHandle">
+            <summary>
+            Gets the window handle.
+            </summary>
+        </member>
+        <member name="M:PathStructure.WindowWatch.CheckWindow(SHDocVw.ShellBrowserWindow)">
+            <summary>
+            Returns true when the path changes.
+            </summary>
+        </member>
+    </members>
+</doc>

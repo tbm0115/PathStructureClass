@@ -106,7 +106,7 @@ namespace PathStructure
                 // Get all the open Explorer windows
                 try
                 {
-                    foreach (ShellBrowserWindow w in (IShellWindows)exShell.Windows)
+                    foreach (ShellBrowserWindow w in exShell.Windows() as IShellWindows)
                     {
                         if (_cancel)
                         {

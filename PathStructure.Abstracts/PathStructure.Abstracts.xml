@@ -1,0 +1,133 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>PathStructure.Abstracts</name>
+    </assembly>
+    <members>
+        <member name="T:PathStructure.Abstracts.IPathMatchNode">
+            <summary>
+            Captures a node match during validation.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathMatchNode.Node">
+            <summary>
+            Gets the matched configuration node.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathMatchNode.MatchedValue">
+            <summary>
+            Gets the matched substring for the node.
+            </summary>
+        </member>
+        <member name="T:PathStructure.Abstracts.IPathNode">
+            <summary>
+            Represents a node in the configured path structure tree.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathNode.Name">
+            <summary>
+            Gets the display name for the node.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathNode.Pattern">
+            <summary>
+            Gets the regex pattern for this node.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathNode.Children">
+            <summary>
+            Gets the child nodes for this node.
+            </summary>
+        </member>
+        <member name="M:PathStructure.Abstracts.IPathNode.GetRegex(System.Text.RegularExpressions.RegexOptions)">
+            <summary>
+            Builds a regex for the node using the provided options.
+            </summary>
+        </member>
+        <member name="T:PathStructure.Abstracts.IPathStructure">
+            <summary>
+            Defines the path validation service that evaluates paths against a structure tree.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathStructure.Config">
+            <summary>
+            Gets the active configuration for the structure.
+            </summary>
+        </member>
+        <member name="M:PathStructure.Abstracts.IPathStructure.ValidatePath(System.String)">
+            <summary>
+            Validates a full path and returns the validation result.
+            </summary>
+        </member>
+        <member name="T:PathStructure.Abstracts.IPathStructureConfig">
+            <summary>
+            Represents configuration for the path structure service.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathStructureConfig.Root">
+            <summary>
+            Gets the root node of the configured structure.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathStructureConfig.RegexOptions">
+            <summary>
+            Gets or sets the regex options used for matching.
+            </summary>
+        </member>
+        <member name="T:PathStructure.Abstracts.IPathValidationResult">
+            <summary>
+            Represents the result of a path validation attempt.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathValidationResult.IsValid">
+            <summary>
+            Gets a value indicating whether the path is valid.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathValidationResult.Error">
+            <summary>
+            Gets the error message when validation fails.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathValidationResult.Variables">
+            <summary>
+            Gets the captured variables from named regex groups.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.IPathValidationResult.MatchTrail">
+            <summary>
+            Gets the ordered list of node matches.
+            </summary>
+        </member>
+        <member name="T:PathStructure.Abstracts.IPathValidationRule">
+            <summary>
+            Defines a custom validation rule for validated paths.
+            </summary>
+        </member>
+        <member name="M:PathStructure.Abstracts.IPathValidationRule.Validate(System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.String},System.Collections.Generic.IReadOnlyList{PathStructure.Abstracts.IPathMatchNode})">
+            <summary>
+            Validates the path using captured variables and match context.
+            </summary>
+        </member>
+        <member name="T:PathStructure.Abstracts.IWatcherPlugin">
+            <summary>
+            Defines the contract for watcher plugins that integrate with PathStructure clients.
+            </summary>
+        </member>
+        <member name="T:PathStructure.Abstracts.PathEventArgs">
+            <summary>
+            Event payload for plugins requesting or setting path values.
+            </summary>
+        </member>
+        <member name="P:PathStructure.Abstracts.PathEventArgs.Path">
+            <summary>
+            Gets or sets the path value associated with the event.
+            </summary>
+        </member>
+        <member name="T:PathStructure.Abstracts.PluginServices">
+            <summary>
+            Discovers and activates plugin implementations from assemblies.
+            </summary>
+        </member>
+    </members>
+</doc>

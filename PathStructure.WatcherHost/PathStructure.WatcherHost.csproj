@@ -38,8 +38,12 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\PathStructure.Abstracts\PathStructure.Abstracts.csproj">
+      <Project>{c6d3e799-1b01-4fd8-b4c0-90a4a11d8cf6}</Project>
+      <Name>PathStructure.Abstracts</Name>
+    </ProjectReference>
     <ProjectReference Include="..\PathStructure\PathStructure.csproj">
-      <Project>{1D9E4A37-6C0E-44D7-9047-7F0F1F0B6E5A}</Project>
+      <Project>{1d9e4a37-6c0e-44d7-9047-7f0f1f0b6e5a}</Project>
       <Name>PathStructure</Name>
     </ProjectReference>
   </ItemGroup>

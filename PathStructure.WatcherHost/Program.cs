@@ -58,7 +58,7 @@ namespace PathStructure.WatcherHost
             };
             _watcher.ExplorerWatcherAborted += (sender, exceptionArgs) =>
             {
-                BroadcastEvent("aborted", "Explorer watcher aborted.", exceptionArgs.ExceptionObject?.ToString());
+                BroadcastEvent("aborted", "Explorer watcher aborted.", exceptionArgs?.ToString());
             };
 
             _watcher.StartWatcher();
