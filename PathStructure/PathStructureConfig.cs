@@ -1,29 +1,22 @@
 using System;
 using System.Text.RegularExpressions;
+using PathStructure.Abstracts;
 
 namespace PathStructure
 {
-    /// <summary>
-    /// Represents configuration for the path structure service.
-    /// </summary>
-    public class PathStructureConfig
+    /// <inheritdoc />
+    public class PathStructureConfig : IPathStructureConfig
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PathStructureConfig"/> class.
-        /// </summary>
-        public PathStructureConfig(PathNode root)
+        /// <inheritdoc />
+        public PathStructureConfig(IPathNode root)
         {
             Root = root ?? throw new ArgumentNullException(nameof(root));
         }
 
-        /// <summary>
-        /// Gets the root node of the structure.
-        /// </summary>
-        public PathNode Root { get; }
+        /// <inheritdoc />
+        public IPathNode Root { get; }
 
-        /// <summary>
-        /// Gets or sets the regex options used for matching.
-        /// </summary>
+        /// <inheritdoc />
         public RegexOptions RegexOptions { get; set; } = RegexOptions.IgnoreCase;
     }
 }

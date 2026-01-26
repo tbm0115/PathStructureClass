@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace PathStructure
+namespace PathStructure.Abstracts
 {
     /// <summary>
     /// Defines a custom validation rule for validated paths.
@@ -10,6 +10,6 @@ namespace PathStructure
         /// <summary>
         /// Validates the path using captured variables and match context.
         /// </summary>
-        PathValidationResult Validate(string fullPath, IReadOnlyDictionary<string, string> variables, IReadOnlyList<PathMatchNode> matchTrail);
+        IPathValidationResult Validate(string fullPath, IReadOnlyDictionary<string, string> variables, IReadOnlyList<IPathMatchNode> matchTrail);
     }
 }

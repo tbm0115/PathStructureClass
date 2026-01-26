@@ -2,34 +2,29 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using PathStructure.Abstracts;
 namespace PathStructure
 {
-    /// <summary>
-    /// Service for validating file system paths against a configured tree of regex-based nodes.
-    /// </summary>
-    public class PathStructure
+    /// <inheritdoc />
+    public class PathStructure : IPathStructure
     {
-        private readonly PathStructureConfig _config;
+        private readonly IPathStructureConfig _config;
         private readonly IReadOnlyList<IPathValidationRule> _validationRules;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PathStructure"/> class.
         /// </summary>
-        public PathStructure(PathStructureConfig config, IEnumerable<IPathValidationRule> validationRules = null)
+        public PathStructure(IPathStructureConfig config, IEnumerable<IPathValidationRule> validationRules = null)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
-            _validationRules = (validationRules ?? Array.Empty<IPathValidationRule>()).ToList();
+            _validationRules = (validationRules ?? Enumerable.Empty<IPathValidationRule>()).ToList();
         }
 
-        /// <summary>
-        /// Gets the active configuration.
-        /// </summary>
-        public PathStructureConfig Config => _config;
+        /// <inheritdoc />
+        public IPathStructureConfig Config => _config;
 
-        /// <summary>
-        /// Validates a full path and returns details about matches and captured variables.
-        /// </summary>
-        public PathValidationResult ValidatePath(string fullPath)
+        /// <inheritdoc />
+        public IPathValidationResult ValidatePath(string fullPath)
         {
             if (string.IsNullOrWhiteSpace(fullPath))
             {
@@ -38,7 +33,7 @@ namespace PathStructure
 
             var normalizedPath = NormalizePath(fullPath);
             var variables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var matchTrail = new List<PathMatchNode>();
+            var matchTrail = new List<IPathMatchNode>();
 
             var matchesRoot = TryMatchNode(_config.Root, normalizedPath, variables, matchTrail, out var failure);
             if (!matchesRoot)
@@ -62,10 +57,10 @@ namespace PathStructure
         /// Attempts to match a path segment against the configured node tree.
         /// </summary>
         private bool TryMatchNode(
-            PathNode node,
+            IPathNode node,
             string remainingPath,
             Dictionary<string, string> variables,
-            List<PathMatchNode> matchTrail,
+            List<IPathMatchNode> matchTrail,
             out string failure)
         {
             failure = null;
@@ -83,7 +78,7 @@ namespace PathStructure
                 return false;
             }
 
-            if (!CaptureVariables(match, variables, out failure))
+            if (!CaptureVariables(match, regex.GetGroupNames(), variables, out failure))
             {
                 return false;
             }
@@ -104,7 +99,7 @@ namespace PathStructure
             foreach (var child in node.Children)
             {
                 var childVariables = new Dictionary<string, string>(variables, StringComparer.OrdinalIgnoreCase);
-                var childTrail = new List<PathMatchNode>(matchTrail);
+                var childTrail = new List<IPathMatchNode>(matchTrail);
                 if (TryMatchNode(child, unmatched, childVariables, childTrail, out failure))
                 {
                     variables.Clear();
@@ -125,10 +120,14 @@ namespace PathStructure
         /// <summary>
         /// Captures named group values into a shared variable dictionary while enforcing consistency.
         /// </summary>
-        private static bool CaptureVariables(Match match, Dictionary<string, string> variables, out string failure)
+        private static bool CaptureVariables(
+            Match match,
+            IEnumerable<string> groupNames,
+            Dictionary<string, string> variables,
+            out string failure)
         {
             failure = null;
-            foreach (var groupName in match.Groups.Keys)
+            foreach (var groupName in groupNames ?? Enumerable.Empty<string>())
             {
                 if (int.TryParse(groupName, out _))
                 {
