@@ -78,7 +78,7 @@ namespace PathStructure
                 return false;
             }
 
-            if (!CaptureVariables(match, match.Regex.GetGroupNames(), variables, out failure))
+            if (!CaptureVariables(match, regex.GetGroupNames(), variables, out failure))
             {
                 return false;
             }
