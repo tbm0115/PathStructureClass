@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System.Text.Json;
 
 namespace PathStructure
 {
@@ -15,6 +15,6 @@ namespace PathStructure
         /// <summary>
         /// Gets or sets the plugin options payload.
         /// </summary>
-        public Dictionary<string, object> Options { get; set; } = new Dictionary<string, object>();
+        public JsonElement Options { get; set; }
     }
 }

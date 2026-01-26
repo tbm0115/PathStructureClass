@@ -1,6 +1,6 @@
 # PathStructure Configuration
 
-PathStructure uses a JSON configuration file to describe valid paths, optional UI metadata, and plugins. The configuration loader supports `//` and `/* */` comments, but the stored file should still be valid JSON after comment removal.
+PathStructure uses a JSON configuration file to describe valid paths, optional UI metadata, and plugins. The configuration loader supports `//` and `/* */` comments and trailing commas.
 
 ## Top-Level Schema
 
@@ -67,3 +67,7 @@ var pathStructure = new PathStructure(config);
 ```
 
 The loader resolves imports, applies namespace prefixes, and builds a root node so the `PathStructure` validator can use the configured paths.
+
+## Examples
+
+- `docs/tams-mtconnect-config.json` provides a ready-to-use configuration for the TAMS MTConnect filesystem layout.

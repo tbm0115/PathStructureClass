@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Web.Script.Serialization;
+using System.Text.Json;
 using PathStructure.Abstracts;
 
 namespace PathStructure
@@ -45,20 +44,17 @@ namespace PathStructure
             }
 
             var rawJson = File.ReadAllText(filePath);
-            var sanitizedJson = StripJsonComments(rawJson);
-            var serializer = new JavaScriptSerializer();
-            var config = serializer.Deserialize<PathStructureConfig>(sanitizedJson) ?? new PathStructureConfig();
+            var serializerOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                AllowTrailingCommas = true,
+                ReadCommentHandling = JsonCommentHandling.Skip
+            };
+            var config = JsonSerializer.Deserialize<PathStructureConfig>(rawJson, serializerOptions) ?? new PathStructureConfig();
 
             config.Imports = config.Imports ?? new List<PathStructureImport>();
             config.Paths = config.Paths ?? new List<PathStructurePath>();
             config.Plugins = config.Plugins ?? new List<PathStructurePlugin>();
-            foreach (var plugin in config.Plugins)
-            {
-                if (plugin != null && plugin.Options == null)
-                {
-                    plugin.Options = new Dictionary<string, object>();
-                }
-            }
 
             var mergedPaths = new List<PathStructurePath>();
             var mergedPlugins = new List<PathStructurePlugin>();
@@ -164,6 +160,7 @@ namespace PathStructure
             return NamedGroupRegex.Replace(regex, match =>
             {
                 var name = match.Groups["name"].Value;
+                // Do not close the group here; the remainder of the regex includes the closing parenthesis.
                 return $"(?<{prefix}{name}>";
             });
         }
@@ -203,88 +200,5 @@ namespace PathStructure
             return normalized + "_";
         }
 
-        private static string StripJsonComments(string json)
-        {
-            if (string.IsNullOrEmpty(json))
-            {
-                return json;
-            }
-
-            var builder = new StringBuilder(json.Length);
-            var inString = false;
-            var inSingleLineComment = false;
-            var inMultiLineComment = false;
-
-            for (var i = 0; i < json.Length; i++)
-            {
-                var current = json[i];
-                var next = i + 1 < json.Length ? json[i + 1] : '\0';
-
-                if (inSingleLineComment)
-                {
-                    if (current == '\n')
-                    {
-                        inSingleLineComment = false;
-                        builder.Append(current);
-                    }
-
-                    continue;
-                }
-
-                if (inMultiLineComment)
-                {
-                    if (current == '*' && next == '/')
-                    {
-                        inMultiLineComment = false;
-                        i++;
-                    }
-
-                    continue;
-                }
-
-                if (inString)
-                {
-                    if (current == '\\' && i + 1 < json.Length)
-                    {
-                        builder.Append(current);
-                        builder.Append(json[++i]);
-                        continue;
-                    }
-
-                    if (current == '"')
-                    {
-                        inString = false;
-                    }
-
-                    builder.Append(current);
-                    continue;
-                }
-
-                if (current == '"')
-                {
-                    inString = true;
-                    builder.Append(current);
-                    continue;
-                }
-
-                if (current == '/' && next == '/')
-                {
-                    inSingleLineComment = true;
-                    i++;
-                    continue;
-                }
-
-                if (current == '/' && next == '*')
-                {
-                    inMultiLineComment = true;
-                    i++;
-                    continue;
-                }
-
-                builder.Append(current);
-            }
-
-            return builder.ToString();
-        }
     }
 }

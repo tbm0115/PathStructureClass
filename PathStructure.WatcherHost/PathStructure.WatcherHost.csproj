@@ -8,7 +8,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>PathStructure.WatcherHost</RootNamespace>
     <AssemblyName>PathStructure.WatcherHost</AssemblyName>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
