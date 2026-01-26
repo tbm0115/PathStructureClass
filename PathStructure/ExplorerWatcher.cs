@@ -1,5 +1,5 @@
 using System;
-using System.Timers;
+using System.Threading;
 using Shell32;
 using SHDocVw;
 
@@ -12,7 +12,9 @@ namespace PathStructure
     {
         private readonly PathStructure _pathStruct;
         private readonly ExplorerWatcherOptions _options;
-        private readonly Timer _watcher;
+        private Timer _watcher;
+        private readonly AutoResetEvent _pollSignal = new AutoResetEvent(false);
+        private Thread _staThread;
         private bool _cancel;
         private ExplorerWatcherFoundEventArgs _evt;
 
@@ -43,8 +45,6 @@ namespace PathStructure
         {
             _pathStruct = pathStruct;
             _options = options ?? new ExplorerWatcherOptions();
-            _watcher = new Timer(_options.PollRateMs);
-            _watcher.Elapsed += ExplorerQuery;
             _cancel = false;
         }
 
@@ -53,7 +53,20 @@ namespace PathStructure
         /// </summary>
         public void StartWatcher()
         {
-            _watcher.Start();
+            _cancel = false;
+
+            if (_staThread == null || !_staThread.IsAlive)
+            {
+                _staThread = new Thread(PollLoop)
+                {
+                    IsBackground = true
+                };
+                _staThread.SetApartmentState(ApartmentState.STA);
+                _staThread.Start();
+            }
+
+            _watcher?.Dispose();
+            _watcher = new Timer(_ => _pollSignal.Set(), null, 0, _options.PollRateMs);
         }
 
         /// <summary>
@@ -64,8 +77,10 @@ namespace PathStructure
             _cancel = true;
             try
             {
-                _watcher.Stop();
-                _cancel = false;
+                _watcher?.Change(Timeout.Infinite, Timeout.Infinite);
+                _watcher?.Dispose();
+                _watcher = null;
+                _pollSignal.Set();
             }
             catch (Exception ex)
             {
@@ -82,17 +97,23 @@ namespace PathStructure
         }
 
         /// <summary>
-        /// Handles timer events for polling.
+        /// Executes polling on a dedicated STA thread.
         /// </summary>
-        private void ExplorerQuery(object sender, ElapsedEventArgs e)
+        private void PollLoop()
         {
-            ExplorerQuery();
+            while (true)
+            {
+                _pollSignal.WaitOne();
+                if (_cancel)
+                {
+                    break;
+                }
+
+                ExplorerQueryInternal();
+            }
         }
 
-        /// <summary>
-        /// Performs a poll of open shell windows.
-        /// </summary>
-        private void ExplorerQuery()
+        private void ExplorerQueryInternal()
         {
             var exShell = new Shell();
             if (_evt == null)
