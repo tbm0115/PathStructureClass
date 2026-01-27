@@ -113,7 +113,8 @@ h2 {
 
 .child-panel-content {
   overflow: hidden;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
   max-height: calc(60vh - 120px);
 }
@@ -137,7 +138,8 @@ h2 {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
@@ -146,15 +148,16 @@ h2 {
   border: 1px solid #253045;
   padding: 14px 16px;
   background: #111827;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
 }
 
 .path-item-main {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .path-name {
