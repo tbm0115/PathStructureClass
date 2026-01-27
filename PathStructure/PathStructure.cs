@@ -70,16 +70,50 @@ namespace PathStructure
                 return false;
             }
 
-            failure = null;
-            var regex = node.GetRegex(_config.RegexOptions);
-            var allowPartial = node.Children.Count > 0;
-            var lastFailure = $"Pattern '{node.Pattern}' did not match '{remainingPath}'.";
-
-            foreach (var candidateLength in GetCandidateMatchLengths(remainingPath, allowPartial))
+            if (node == _config.Root)
             {
-                var candidate = remainingPath.Substring(0, candidateLength);
-                var match = regex.Match(candidate);
-                if (!match.Success || match.Index != 0 || match.Length != candidate.Length)
+                if (node.Children.Count == 0)
+                {
+                    failure = "No path structures were configured.";
+                    return false;
+                }
+
+                foreach (var child in node.Children)
+                {
+                    if (TryMatchNode(child, remainingPath, variables, matchTrail, out failure))
+                    {
+                        return true;
+                    }
+                }
+
+                failure = $"No configured path matched '{remainingPath}'.";
+                return false;
+            }
+
+            failure = null;
+            if (string.IsNullOrWhiteSpace(remainingPath))
+            {
+                failure = $"Pattern '{node.Pattern}' did not match an empty path.";
+                return false;
+            }
+
+            var segments = SplitSegments(remainingPath);
+            if (segments.Count == 0)
+            {
+                failure = $"Pattern '{node.Pattern}' did not match '{remainingPath}'.";
+                return false;
+            }
+
+            var separator = DetectSeparator(remainingPath);
+            var regex = node.GetRegex(_config.RegexOptions);
+            var lastFailure = $"Pattern '{node.Pattern}' did not match '{remainingPath}'.";
+            var current = string.Empty;
+
+            for (var index = 0; index < segments.Count; index++)
+            {
+                current = index == 0 ? segments[index] : $"{current}{separator}{segments[index]}";
+                var match = regex.Match(current);
+                if (!match.Success || match.Index != 0 || match.Length != current.Length)
                 {
                     continue;
                 }
@@ -96,9 +130,10 @@ namespace PathStructure
                     new PathMatchNode(node, match.Value)
                 };
 
+                var remainingSegments = segments.Skip(index + 1).ToList();
                 if (node.Children.Count == 0)
                 {
-                    if (candidateLength == remainingPath.Length)
+                    if (remainingSegments.Count == 0)
                     {
                         ApplyMatchOutcome(variables, matchTrail, candidateVariables, candidateTrail);
                         return true;
@@ -107,13 +142,13 @@ namespace PathStructure
                     continue;
                 }
 
-                var unmatched = TrimSeparators(remainingPath.Substring(candidateLength));
-                if (string.IsNullOrEmpty(unmatched))
+                if (remainingSegments.Count == 0)
                 {
                     ApplyMatchOutcome(variables, matchTrail, candidateVariables, candidateTrail);
                     return true;
                 }
 
+                var unmatched = string.Join(separator.ToString(), remainingSegments);
                 foreach (var child in node.Children)
                 {
                     var childVariables = new Dictionary<string, string>(candidateVariables, StringComparer.OrdinalIgnoreCase);
@@ -135,44 +170,19 @@ namespace PathStructure
             return false;
         }
 
-        private static IEnumerable<int> GetCandidateMatchLengths(string remainingPath, bool allowPartial)
+        private static List<string> SplitSegments(string path)
         {
-            if (string.IsNullOrEmpty(remainingPath))
-            {
-                yield break;
-            }
-
-            if (!allowPartial)
-            {
-                yield return remainingPath.Length;
-                yield break;
-            }
-
-            var boundaries = new List<int>();
-            for (var index = 1; index < remainingPath.Length; index++)
-            {
-                if (IsSeparator(remainingPath[index]) && !IsSeparator(remainingPath[index - 1]))
-                {
-                    boundaries.Add(index);
-                }
-            }
-
-            boundaries.Add(remainingPath.Length);
-
-            for (var index = 0; index < boundaries.Count; index++)
-            {
-                yield return boundaries[index];
-            }
+            return path.Split(PathSeparators, StringSplitOptions.RemoveEmptyEntries).ToList();
         }
 
-        private static bool IsSeparator(char value)
+        private static char DetectSeparator(string path)
         {
-            return value == PathSeparators[0] || value == PathSeparators[1];
-        }
+            if (string.IsNullOrEmpty(path))
+            {
+                return PathSeparators[0];
+            }
 
-        private static string TrimSeparators(string path)
-        {
-            return string.IsNullOrEmpty(path) ? path : path.TrimStart(PathSeparators);
+            return path.Contains(PathSeparators[0]) ? PathSeparators[0] : PathSeparators[1];
         }
 
         private static void ApplyMatchOutcome(
