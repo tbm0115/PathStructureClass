@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -117,7 +118,7 @@ namespace PathStructure.WatcherHost
 
         private static async Task MonitorClientAsync(TcpClient client, NetworkStream stream, CancellationToken token)
         {
-            var buffer = new byte[1];
+            using var reader = new StreamReader(stream, Encoding.UTF8, false, 1024, true);
             try
             {
                 while (!token.IsCancellationRequested)
@@ -127,14 +128,18 @@ namespace PathStructure.WatcherHost
                         break;
                     }
 
-                    if (stream.DataAvailable)
+                    var line = await reader.ReadLineAsync().ConfigureAwait(false);
+                    if (line == null)
                     {
-                        await stream.ReadAsync(buffer, 0, buffer.Length, token).ConfigureAwait(false);
+                        break;
                     }
-                    else
+
+                    if (string.IsNullOrWhiteSpace(line))
                     {
-                        await Task.Delay(500, token).ConfigureAwait(false);
+                        continue;
                     }
+
+                    await HandleClientCommandAsync(line, stream).ConfigureAwait(false);
                 }
             }
             catch (Exception)
@@ -235,6 +240,108 @@ namespace PathStructure.WatcherHost
             }
         }
 
+        private static async Task HandleClientCommandAsync(string payload, NetworkStream stream)
+        {
+            JsonDocument document;
+            try
+            {
+                document = JsonDocument.Parse(payload);
+            }
+            catch (JsonException)
+            {
+                await SendCommandResponseAsync(stream, "invalidCommand", "Command payload was not valid JSON.", payload).ConfigureAwait(false);
+                return;
+            }
+
+            using (document)
+            {
+                if (!document.RootElement.TryGetProperty("command", out var commandElement))
+                {
+                    await SendCommandResponseAsync(stream, "invalidCommand", "Command payload missing 'command'.", payload).ConfigureAwait(false);
+                    return;
+                }
+
+                var command = commandElement.GetString();
+                switch (command)
+                {
+                    case "addPath":
+                        await HandleAddPathCommandAsync(document.RootElement, stream).ConfigureAwait(false);
+                        break;
+                    default:
+                        await SendCommandResponseAsync(stream, "unknownCommand", $"Unknown command '{command}'.", payload).ConfigureAwait(false);
+                        break;
+                }
+            }
+        }
+
+        private static async Task HandleAddPathCommandAsync(JsonElement root, NetworkStream stream)
+        {
+            if (_pathStructure?.Config == null)
+            {
+                await SendCommandResponseAsync(stream, "addPathFailed", "PathStructure is not initialized.", null).ConfigureAwait(false);
+                return;
+            }
+
+            if (!root.TryGetProperty("regex", out var regexElement))
+            {
+                await SendCommandResponseAsync(stream, "addPathFailed", "Missing required 'regex' property.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var regex = regexElement.GetString();
+            if (string.IsNullOrWhiteSpace(regex))
+            {
+                await SendCommandResponseAsync(stream, "addPathFailed", "Provided regex was empty.", null).ConfigureAwait(false);
+                return;
+            }
+
+            if (_pathStructure.Config.Paths.Any(path => string.Equals(path.Regex, regex, StringComparison.OrdinalIgnoreCase)))
+            {
+                await SendCommandResponseAsync(stream, "addPathDuplicate", "Path regex already exists.", regex).ConfigureAwait(false);
+                return;
+            }
+
+            var newPath = new PathStructurePath
+            {
+                Regex = regex,
+                Name = GetOptionalString(root, "name") ?? regex.Trim(),
+                FlavorTextTemplate = GetOptionalString(root, "flavorTextTemplate"),
+                BackgroundColor = GetOptionalString(root, "backgroundColor"),
+                ForegroundColor = GetOptionalString(root, "foregroundColor"),
+                Icon = GetOptionalString(root, "icon")
+            };
+
+            _pathStructure.Config.Paths.Add(newPath);
+            if (_pathStructure.Config.Root is PathNode rootNode)
+            {
+                rootNode.Children.Add(BuildPathNode(newPath));
+            }
+
+            await SendCommandResponseAsync(stream, "addPathSuccess", "Path regex added.", regex).ConfigureAwait(false);
+        }
+
+        private static string GetOptionalString(JsonElement root, string propertyName)
+        {
+            return root.TryGetProperty(propertyName, out var element) ? element.GetString() : null;
+        }
+
+        private static PathNode BuildPathNode(PathStructurePath path)
+        {
+            var name = string.IsNullOrWhiteSpace(path.Name) ? path.Regex.Trim() : path.Name.Trim();
+            return new PathNode(
+                name,
+                path.Regex,
+                path.FlavorTextTemplate,
+                path.BackgroundColor,
+                path.ForegroundColor,
+                path.Icon);
+        }
+
+        private static Task SendCommandResponseAsync(NetworkStream stream, string type, string message, string path)
+        {
+            return SendAsync(stream, BuildEventPayload(type, message, path));
+        }
+
         private static MatchSummary FindClosestMatches(string url)
         {
             var nodes = EnumerateMatchNodes().ToList();
@@ -319,7 +426,14 @@ namespace PathStructure.WatcherHost
             }
 
             var pattern = node.Pattern ?? string.Empty;
-            return pattern.Contains(@"\.") || Regex.IsMatch(pattern, @"\\\.[^\\]*\$?");
+            var segments = pattern.Split(new[] { @"\\" }, StringSplitOptions.None);
+            var lastSegment = segments.Length > 0 ? segments[segments.Length - 1] : pattern;
+            if (!pattern.EndsWith("$", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            return Regex.IsMatch(lastSegment, @"\\\.[^\\]+\\?\$?$") || Regex.IsMatch(lastSegment, @"\.[^\\]+\\?\$?$");
         }
 
         private static bool IsFolderRegex(IPathNode node)
@@ -354,7 +468,7 @@ namespace PathStructure.WatcherHost
                     continue;
                 }
 
-                matches.Add(new PathPatternMatch(node.Name, node.Pattern, match.Value, match.Value.Length));
+                matches.Add(BuildPatternMatch(node, match));
             }
 
             if (matches.Count == 0)
@@ -433,6 +547,20 @@ namespace PathStructure.WatcherHost
         }
 #endif
 
+        private static PathPatternMatch BuildPatternMatch(IPathNode node, Match match)
+        {
+            var metadata = node as PathNode;
+            return new PathPatternMatch(
+                node?.Name,
+                node?.Pattern,
+                match?.Value,
+                match?.Value?.Length ?? 0,
+                metadata?.FlavorTextTemplate,
+                metadata?.BackgroundColor,
+                metadata?.ForegroundColor,
+                metadata?.Icon);
+        }
+
         private sealed class MatchSummary
         {
             public static readonly MatchSummary Empty = new MatchSummary(Array.Empty<PathPatternMatch>(), Array.Empty<PathPatternMatch>(), Array.Empty<PathPatternMatch>(), null);
@@ -472,18 +600,34 @@ namespace PathStructure.WatcherHost
 
         private readonly struct PathPatternMatch
         {
-            public PathPatternMatch(string nodeName, string pattern, string matchedValue, int matchLength)
+            public PathPatternMatch(
+                string nodeName,
+                string pattern,
+                string matchedValue,
+                int matchLength,
+                string flavorTextTemplate,
+                string backgroundColor,
+                string foregroundColor,
+                string icon)
             {
                 NodeName = nodeName;
                 Pattern = pattern;
                 MatchedValue = matchedValue;
                 MatchLength = matchLength;
+                FlavorTextTemplate = flavorTextTemplate;
+                BackgroundColor = backgroundColor;
+                ForegroundColor = foregroundColor;
+                Icon = icon;
             }
 
             public string NodeName { get; }
             public string Pattern { get; }
             public string MatchedValue { get; }
             public int MatchLength { get; }
+            public string FlavorTextTemplate { get; }
+            public string BackgroundColor { get; }
+            public string ForegroundColor { get; }
+            public string Icon { get; }
         }
     }
 }

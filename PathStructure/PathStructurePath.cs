@@ -11,6 +11,11 @@ namespace PathStructure
         public string Regex { get; set; }
 
         /// <summary>
+        /// Gets or sets the display name for the path.
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
         /// Gets or sets the flavor text template for the path.
         /// </summary>
         public string FlavorTextTemplate { get; set; }
