@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, MenuItem, Tray, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, MenuItem, Tray, ipcMain, nativeImage, dialog } = require('electron');
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -10,6 +10,7 @@ const watcherProcessName = 'PathStructure.WatcherHost.exe';
 
 let mainWindow;
 let addPathWindow;
+let importUrlWindow;
 let tray;
 let watcherProcess;
 let reconnectTimer;
@@ -78,6 +79,35 @@ const createAddPathWindow = () => {
   return addPathWindow;
 };
 
+const createImportUrlWindow = () => {
+  if (importUrlWindow) {
+    importUrlWindow.focus();
+    return importUrlWindow;
+  }
+
+  importUrlWindow = new BrowserWindow({
+    width: 420,
+    height: 240,
+    resizable: false,
+    show: false,
+    parent: mainWindow ?? undefined,
+    modal: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'src', 'preload.js')
+    }
+  });
+
+  importUrlWindow.loadFile(path.join(__dirname, 'src', 'import-url.html'));
+  importUrlWindow.once('ready-to-show', () => importUrlWindow.show());
+  importUrlWindow.on('closed', () => {
+    importUrlWindow = null;
+  });
+
+  return importUrlWindow;
+};
+
 const hideToTray = () => {
   if (!mainWindow) {
     return;
@@ -139,6 +169,23 @@ const createAppMenu = () => {
   });
 
   const template = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Import Configuration File...',
+          click: async () => {
+            await handleImportFile();
+          }
+        },
+        {
+          label: 'Import Configuration URL...',
+          click: () => {
+            createImportUrlWindow();
+          }
+        }
+      ]
+    },
     {
       label: 'Edit',
       submenu: [
@@ -275,6 +322,44 @@ const connectToWatcherHost = () => {
   rpcService.connect();
 };
 
+const sendImportRequest = async (params) => {
+  if (!rpcService) {
+    sendStatusUpdate({ connected: false, message: 'JSON-RPC service not available.' });
+    return;
+  }
+
+  try {
+    await rpcService.sendRequest('importPathStructure', params);
+    sendStatusUpdate({ connected: true, message: 'Import added. Reloading configuration...' });
+    rpcService.disconnect();
+    connectToWatcherHost();
+  } catch (error) {
+    sendStatusUpdate({
+      connected: true,
+      message: 'Unable to import configuration.',
+      errorDetails: error?.message || error
+    });
+  }
+};
+
+const handleImportFile = async () => {
+  if (!mainWindow) {
+    return;
+  }
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import Path Structure Configuration',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['openFile']
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return;
+  }
+
+  await sendImportRequest({ filePath: result.filePaths[0] });
+};
+
 const bootWatcherHost = async () => {
   await stopExistingWatcherHost();
   startWatcherHost();
@@ -337,6 +422,13 @@ ipcMain.handle('soft-reset', () => {
 
 ipcMain.handle('open-add-path-window', () => {
   createAddPathWindow();
+});
+
+ipcMain.handle('import-url', async (_event, url) => {
+  if (!url || typeof url !== 'string') {
+    return;
+  }
+  await sendImportRequest({ url });
 });
 
 ipcMain.handle('client-status', (_event, status) => {

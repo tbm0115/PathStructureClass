@@ -111,48 +111,6 @@ h2 {
   margin-top: -4px;
 }
 
-.import-panel {
-  display: grid;
-  gap: 8px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid #253045;
-  background: #111827;
-}
-
-.import-panel .subtitle {
-  margin: 0;
-  font-size: 0.85rem;
-}
-
-.import-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.import-url {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex: 1;
-  min-width: 240px;
-}
-
-.import-url input {
-  flex: 1;
-  background: #0f1521;
-  border: 1px solid #273349;
-  border-radius: 10px;
-  padding: 8px 12px;
-  color: #f8fafc;
-}
-
-.import-url input::placeholder {
-  color: #7f8aa7;
-}
-
 .child-panel-content {
   overflow: hidden;
   display: flex;
