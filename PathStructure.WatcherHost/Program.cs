@@ -15,6 +15,9 @@ using PathStructure.Abstracts;
 
 namespace PathStructure.WatcherHost
 {
+    /// <summary>
+    /// Hosts the Explorer watcher and streams JSON-RPC notifications/responses to clients.
+    /// </summary>
     internal class Program
     {
         private const int DefaultPort = 49321;
@@ -23,7 +26,14 @@ namespace PathStructure.WatcherHost
         private static ExplorerWatcher _watcher;
         private static TcpListener _listener;
         private static PathStructure _pathStructure;
+        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
 
+        /// <summary>
+        /// Entry point for the watcher host process.
+        /// </summary>
         [STAThread]
         private static void Main(string[] args)
         {
@@ -55,6 +65,9 @@ namespace PathStructure.WatcherHost
             StartServerAsync(port, _cts.Token).GetAwaiter().GetResult();
         }
 
+        /// <summary>
+        /// Initializes the Explorer watcher and begins polling.
+        /// </summary>
         private static void StartWatcher(string configPath)
         {
             PathStructureConfig config;
@@ -79,16 +92,39 @@ namespace PathStructure.WatcherHost
             _watcher.ExplorerWatcherFound += OnExplorerFound;
             _watcher.ExplorerWatcherError += (sender, exception) =>
             {
-                BroadcastEvent("error", "Explorer watcher error.", exception.Message);
+                BroadcastNotification(new
+                {
+                    jsonrpc = "2.0",
+                    method = "watcherError",
+                    @params = new
+                    {
+                        message = "Explorer watcher error.",
+                        error = exception?.Message,
+                        timestamp = DateTimeOffset.Now.ToString("o")
+                    }
+                });
             };
             _watcher.ExplorerWatcherAborted += (sender, exceptionArgs) =>
             {
-                BroadcastEvent("aborted", "Explorer watcher aborted.", exceptionArgs?.ToString());
+                BroadcastNotification(new
+                {
+                    jsonrpc = "2.0",
+                    method = "watcherAborted",
+                    @params = new
+                    {
+                        message = "Explorer watcher aborted.",
+                        error = exceptionArgs?.ToString(),
+                        timestamp = DateTimeOffset.Now.ToString("o")
+                    }
+                });
             };
 
             _watcher.StartWatcher();
         }
 
+        /// <summary>
+        /// Starts the TCP listener that accepts JSON-RPC client connections.
+        /// </summary>
         private static async Task StartServerAsync(int port, CancellationToken token)
         {
             _listener = new TcpListener(IPAddress.Loopback, port);
@@ -111,11 +147,25 @@ namespace PathStructure.WatcherHost
                 Clients.TryAdd(client, stream);
                 Console.WriteLine("Client connected.");
 
-                await SendAsync(stream, BuildEventPayload("status", "Client connected.", "connected")).ConfigureAwait(false);
+                var statusPayload = new
+                {
+                    jsonrpc = "2.0",
+                    method = "status",
+                    @params = new
+                    {
+                        message = "Client connected.",
+                        state = "connected",
+                        timestamp = DateTimeOffset.Now.ToString("o")
+                    }
+                };
+                await SendAsync(stream, SerializeJson(statusPayload)).ConfigureAwait(false);
                 _ = Task.Run(() => MonitorClientAsync(client, stream, token));
             }
         }
 
+        /// <summary>
+        /// Reads newline-delimited JSON-RPC requests from the client.
+        /// </summary>
         private static async Task MonitorClientAsync(TcpClient client, NetworkStream stream, CancellationToken token)
         {
             using var reader = new StreamReader(stream, Encoding.UTF8, false, 1024, true);
@@ -151,32 +201,51 @@ namespace PathStructure.WatcherHost
             }
         }
 
+        /// <summary>
+        /// Handles Explorer selection updates and broadcasts path change notifications.
+        /// </summary>
         private static void OnExplorerFound(string url)
         {
             var matchSummary = FindClosestMatches(url);
 #if DEBUG
             LogMatches(url, matchSummary);
 #endif
-            BroadcastEvent("pathChanged", "Explorer path changed.", url);
+            BroadcastNotification(new
+            {
+                jsonrpc = "2.0",
+                method = "pathChanged",
+                @params = new
+                {
+                    message = "Explorer path changed.",
+                    path = url,
+                    timestamp = DateTimeOffset.Now.ToString("o")
+                }
+            });
         }
 
-        private static void BroadcastEvent(string type, string message, string path)
+        /// <summary>
+        /// Broadcasts a JSON-RPC notification payload to all connected clients.
+        /// </summary>
+        private static void BroadcastNotification(object payload)
         {
-            var payload = BuildEventPayload(type, message, path);
+            var serialized = SerializeJson(payload);
             foreach (var client in Clients)
             {
-                _ = SendAsync(client.Value, payload);
+                _ = SendAsync(client.Value, serialized);
             }
         }
 
-        private static string BuildEventPayload(string type, string message, string path)
+        /// <summary>
+        /// Serializes payloads to newline-delimited JSON for transport.
+        /// </summary>
+        private static string SerializeJson(object payload)
         {
-            var escapedMessage = EscapeJson(message ?? string.Empty);
-            var escapedPath = EscapeJson(path ?? string.Empty);
-            var timestamp = DateTimeOffset.Now.ToString("o");
-            return $"{{\"type\":\"{type}\",\"message\":\"{escapedMessage}\",\"path\":\"{escapedPath}\",\"timestamp\":\"{timestamp}\"}}\n";
+            return JsonSerializer.Serialize(payload, JsonOptions) + "\n";
         }
 
+        /// <summary>
+        /// Writes a payload to a client stream.
+        /// </summary>
         private static async Task SendAsync(NetworkStream stream, string payload)
         {
             if (stream == null || !stream.CanWrite)
@@ -195,11 +264,9 @@ namespace PathStructure.WatcherHost
             }
         }
 
-        private static string EscapeJson(string value)
-        {
-            return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
-        }
-
+        /// <summary>
+        /// Removes a client and disposes its stream.
+        /// </summary>
         private static void RemoveClient(TcpClient client)
         {
             if (client == null)
@@ -215,6 +282,9 @@ namespace PathStructure.WatcherHost
             client.Close();
         }
 
+        /// <summary>
+        /// Stops the watcher and listener.
+        /// </summary>
         private static void Stop()
         {
             if (_cts.IsCancellationRequested)
@@ -240,75 +310,74 @@ namespace PathStructure.WatcherHost
             }
         }
 
+        /// <summary>
+        /// Handles a JSON-RPC request from a client.
+        /// </summary>
         private static async Task HandleClientCommandAsync(string payload, NetworkStream stream)
         {
-            JsonDocument document;
             try
             {
-                document = JsonDocument.Parse(payload);
-            }
-            catch (JsonException)
-            {
-                await SendCommandResponseAsync(stream, "invalidCommand", "Command payload was not valid JSON.", payload).ConfigureAwait(false);
-                return;
-            }
-
-            using (document)
-            {
-                if (!document.RootElement.TryGetProperty("command", out var commandElement))
+                var request = JsonSerializer.Deserialize<JsonRpcRequest>(payload, JsonOptions);
+                if (request == null || string.IsNullOrWhiteSpace(request.Method))
                 {
-                    await SendCommandResponseAsync(stream, "invalidCommand", "Command payload missing 'command'.", payload).ConfigureAwait(false);
+                    await SendJsonRpcErrorAsync(stream, null, -32600, "Invalid Request", payload).ConfigureAwait(false);
                     return;
                 }
 
-                var command = commandElement.GetString();
-                switch (command)
+                switch (request.Method)
                 {
                     case "addPath":
-                        await HandleAddPathCommandAsync(document.RootElement, stream).ConfigureAwait(false);
+                        await HandleAddPathCommandAsync(request, stream).ConfigureAwait(false);
                         break;
                     default:
-                        await SendCommandResponseAsync(stream, "unknownCommand", $"Unknown command '{command}'.", payload).ConfigureAwait(false);
+                        await SendJsonRpcErrorAsync(stream, request.Id, -32601, $"Unknown method '{request.Method}'.", null).ConfigureAwait(false);
                         break;
                 }
             }
+            catch (JsonException ex)
+            {
+                await SendJsonRpcErrorAsync(stream, null, -32700, "Parse error", ex.Message).ConfigureAwait(false);
+            }
         }
 
-        private static async Task HandleAddPathCommandAsync(JsonElement root, NetworkStream stream)
+        /// <summary>
+        /// Handles the JSON-RPC addPath request.
+        /// </summary>
+        private static async Task HandleAddPathCommandAsync(JsonRpcRequest request, NetworkStream stream)
         {
             if (_pathStructure?.Config == null)
             {
-                await SendCommandResponseAsync(stream, "addPathFailed", "PathStructure is not initialized.", null).ConfigureAwait(false);
+                await SendJsonRpcErrorAsync(stream, request.Id, -32001, "PathStructure is not initialized.", null).ConfigureAwait(false);
                 return;
             }
 
-            if (!root.TryGetProperty("regex", out var regexElement))
+            if (request.Params.ValueKind != JsonValueKind.Object || !request.Params.TryGetProperty("regex", out var regexElement))
             {
-                await SendCommandResponseAsync(stream, "addPathFailed", "Missing required 'regex' property.", null).ConfigureAwait(false);
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Missing required 'regex' property.", null).ConfigureAwait(false);
                 return;
             }
 
             var regex = regexElement.GetString();
             if (string.IsNullOrWhiteSpace(regex))
             {
-                await SendCommandResponseAsync(stream, "addPathFailed", "Provided regex was empty.", null).ConfigureAwait(false);
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Provided regex was empty.", null).ConfigureAwait(false);
                 return;
             }
 
             if (_pathStructure.Config.Paths.Any(path => string.Equals(path.Regex, regex, StringComparison.OrdinalIgnoreCase)))
             {
-                await SendCommandResponseAsync(stream, "addPathDuplicate", "Path regex already exists.", regex).ConfigureAwait(false);
+                await SendJsonRpcErrorAsync(stream, request.Id, -32002, "Path regex already exists.", regex).ConfigureAwait(false);
                 return;
             }
 
             var newPath = new PathStructurePath
             {
                 Regex = regex,
-                Name = GetOptionalString(root, "name") ?? regex.Trim(),
-                FlavorTextTemplate = GetOptionalString(root, "flavorTextTemplate"),
-                BackgroundColor = GetOptionalString(root, "backgroundColor"),
-                ForegroundColor = GetOptionalString(root, "foregroundColor"),
-                Icon = GetOptionalString(root, "icon")
+                Name = GetOptionalString(request.Params, "name") ?? regex.Trim(),
+                FlavorTextTemplate = GetOptionalString(request.Params, "flavorTextTemplate"),
+                BackgroundColor = GetOptionalString(request.Params, "backgroundColor"),
+                ForegroundColor = GetOptionalString(request.Params, "foregroundColor"),
+                Icon = GetOptionalString(request.Params, "icon")
             };
 
             _pathStructure.Config.Paths.Add(newPath);
@@ -317,14 +386,24 @@ namespace PathStructure.WatcherHost
                 rootNode.Children.Add(BuildPathNode(newPath));
             }
 
-            await SendCommandResponseAsync(stream, "addPathSuccess", "Path regex added.", regex).ConfigureAwait(false);
+            await SendJsonRpcResultAsync(stream, request.Id, new
+            {
+                message = "Path regex added.",
+                path = regex
+            }).ConfigureAwait(false);
         }
 
+        /// <summary>
+        /// Reads an optional string property from a JSON element.
+        /// </summary>
         private static string GetOptionalString(JsonElement root, string propertyName)
         {
             return root.TryGetProperty(propertyName, out var element) ? element.GetString() : null;
         }
 
+        /// <summary>
+        /// Builds a path node for runtime additions.
+        /// </summary>
         private static PathNode BuildPathNode(PathStructurePath path)
         {
             var name = string.IsNullOrWhiteSpace(path.Name) ? path.Regex.Trim() : path.Name.Trim();
@@ -337,11 +416,42 @@ namespace PathStructure.WatcherHost
                 path.Icon);
         }
 
-        private static Task SendCommandResponseAsync(NetworkStream stream, string type, string message, string path)
+        /// <summary>
+        /// Sends a JSON-RPC success response.
+        /// </summary>
+        private static Task SendJsonRpcResultAsync(NetworkStream stream, string id, object result)
         {
-            return SendAsync(stream, BuildEventPayload(type, message, path));
+            var payload = new
+            {
+                jsonrpc = "2.0",
+                id,
+                result
+            };
+            return SendAsync(stream, SerializeJson(payload));
         }
 
+        /// <summary>
+        /// Sends a JSON-RPC error response.
+        /// </summary>
+        private static Task SendJsonRpcErrorAsync(NetworkStream stream, string id, int code, string message, object data)
+        {
+            var payload = new
+            {
+                jsonrpc = "2.0",
+                id,
+                error = new
+                {
+                    code,
+                    message,
+                    data
+                }
+            };
+            return SendAsync(stream, SerializeJson(payload));
+        }
+
+        /// <summary>
+        /// Finds the closest matches for a URL against the configured path structure.
+        /// </summary>
         private static MatchSummary FindClosestMatches(string url)
         {
             var nodes = EnumerateMatchNodes().ToList();
@@ -363,6 +473,9 @@ namespace PathStructure.WatcherHost
             return new MatchSummary(Array.Empty<PathPatternMatch>(), folderMatches, parentFolderInfo.Matches, parentFolderInfo.MatchedPath);
         }
 
+        /// <summary>
+        /// Enumerates configured path nodes excluding the root.
+        /// </summary>
         private static IEnumerable<IPathNode> EnumerateMatchNodes()
         {
             if (_pathStructure?.Config?.Root == null)
@@ -386,6 +499,9 @@ namespace PathStructure.WatcherHost
             }
         }
 
+        /// <summary>
+        /// Enumerates all nodes in the structure.
+        /// </summary>
         private static IEnumerable<IPathNode> EnumerateNodes(IPathNode node)
         {
             if (node == null)
@@ -403,6 +519,9 @@ namespace PathStructure.WatcherHost
             }
         }
 
+        /// <summary>
+        /// Determines whether the URL points to a file based on extension and trailing separators.
+        /// </summary>
         private static bool IsFilePath(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
@@ -418,6 +537,9 @@ namespace PathStructure.WatcherHost
             return Path.HasExtension(path);
         }
 
+        /// <summary>
+        /// Determines whether a configured regex represents a file entry.
+        /// </summary>
         private static bool IsFileRegex(IPathNode node)
         {
             if (node == null)
@@ -436,11 +558,17 @@ namespace PathStructure.WatcherHost
             return Regex.IsMatch(lastSegment, @"\\\.[^\\]+\\?\$?$") || Regex.IsMatch(lastSegment, @"\.[^\\]+\\?\$?$");
         }
 
+        /// <summary>
+        /// Determines whether a configured regex represents a folder entry.
+        /// </summary>
         private static bool IsFolderRegex(IPathNode node)
         {
             return !IsFileRegex(node);
         }
 
+        /// <summary>
+        /// Finds the best matching regexes for a given path.
+        /// </summary>
         private static IReadOnlyList<PathPatternMatch> FindBestMatches(
             IEnumerable<IPathNode> nodes,
             string path,
@@ -480,6 +608,9 @@ namespace PathStructure.WatcherHost
             return matches.Where(item => item.MatchLength == bestLength).ToArray();
         }
 
+        /// <summary>
+        /// Walks up the directory tree to find the nearest parent folder matches.
+        /// </summary>
         private static ParentMatchInfo FindNearestParentMatches(
             IEnumerable<IPathNode> nodes,
             string startPath,
@@ -500,6 +631,9 @@ namespace PathStructure.WatcherHost
             return ParentMatchInfo.Empty;
         }
 
+        /// <summary>
+        /// Returns the parent directory path.
+        /// </summary>
         private static string GetParentPath(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
@@ -517,6 +651,9 @@ namespace PathStructure.WatcherHost
         }
 
 #if DEBUG
+        /// <summary>
+        /// Logs matching details for debugging.
+        /// </summary>
         private static void LogMatches(string url, MatchSummary summary)
         {
             if (summary == null || summary.IsEmpty)
@@ -541,12 +678,18 @@ namespace PathStructure.WatcherHost
             }
         }
 
+        /// <summary>
+        /// Formats match results for logging.
+        /// </summary>
         private static string FormatMatches(IEnumerable<PathPatternMatch> matches)
         {
             return string.Join(", ", matches.Select(match => $"{match.NodeName}: {match.Pattern} (match: {match.MatchedValue})"));
         }
 #endif
 
+        /// <summary>
+        /// Builds a match result with node metadata.
+        /// </summary>
         private static PathPatternMatch BuildPatternMatch(IPathNode node, Match match)
         {
             var metadata = node as PathNode;
@@ -561,6 +704,9 @@ namespace PathStructure.WatcherHost
                 metadata?.Icon);
         }
 
+        /// <summary>
+        /// Represents the match summary for a selection.
+        /// </summary>
         private sealed class MatchSummary
         {
             public static readonly MatchSummary Empty = new MatchSummary(Array.Empty<PathPatternMatch>(), Array.Empty<PathPatternMatch>(), Array.Empty<PathPatternMatch>(), null);
@@ -584,6 +730,9 @@ namespace PathStructure.WatcherHost
             public bool IsEmpty => FileMatches.Count == 0 && FolderMatches.Count == 0 && ParentFolderMatches.Count == 0;
         }
 
+        /// <summary>
+        /// Represents nearest parent folder match results.
+        /// </summary>
         private readonly struct ParentMatchInfo
         {
             public static readonly ParentMatchInfo Empty = new ParentMatchInfo(null, Array.Empty<PathPatternMatch>());
@@ -598,6 +747,9 @@ namespace PathStructure.WatcherHost
             public IReadOnlyList<PathPatternMatch> Matches { get; }
         }
 
+        /// <summary>
+        /// Represents a single path pattern match with metadata.
+        /// </summary>
         private readonly struct PathPatternMatch
         {
             public PathPatternMatch(
@@ -628,6 +780,17 @@ namespace PathStructure.WatcherHost
             public string BackgroundColor { get; }
             public string ForegroundColor { get; }
             public string Icon { get; }
+        }
+
+        /// <summary>
+        /// JSON-RPC request payload.
+        /// </summary>
+        private sealed class JsonRpcRequest
+        {
+            public string Jsonrpc { get; set; }
+            public string Id { get; set; }
+            public string Method { get; set; }
+            public JsonElement Params { get; set; }
         }
     }
 }
