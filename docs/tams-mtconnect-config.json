@@ -1,12 +1,24 @@
 {
   "paths": [
     {
+      "regex": "^C:\\\\TAMS?$",
+      "flavorTextTemplate": "TAMS MTConnect integration folder."
+    },
+    {
       "regex": "^C:\\\\TAMS\\\\mtconnect-manifest\\.json$",
       "flavorTextTemplate": "MTConnect manifest for the TAMS installation."
     },
     {
-      "regex": "^C:\\\\TAMS\\\\Tools\\\\?$",
+      "regex": "^C:\\\\TAMS\\\\Tools?$",
       "flavorTextTemplate": "Shared tooling for TAMS integrations."
+    },
+    {
+      "regex": "^C:\\\\TAMS\\\\Adapter?$",
+      "flavorTextTemplate": "Organizer folder for adapter installations."
+    },
+    {
+      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)$",
+      "flavorTextTemplate": "Adapter {{ AdapterName }} installation folder."
     },
     {
       "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\appsettings\\.json$",
@@ -21,40 +33,68 @@
       "flavorTextTemplate": "Adapter {{ AdapterName }} SDK metadata."
     },
     {
+      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports?$",
+      "flavorTextTemplate": "Adapter {{ AdapterName }} SDK imports folder."
+    },
+    {
+      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter?$",
+      "flavorTextTemplate": "Adapter {{ AdapterName }} SHDR library import folder."
+    },
+    {
       "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter\\\\component-package-manifest\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} import manifest."
+      "flavorTextTemplate": "Adapter {{ AdapterName }} SHDR library import manifest."
     },
     {
       "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter\\\\sdk-metadata\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} import metadata."
+      "flavorTextTemplate": "Adapter {{ AdapterName }} SHDR library import metadata."
+    },
+    {
+      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter-source?$",
+      "flavorTextTemplate": "Adapter {{ AdapterName }} data source configuration folder."
     },
     {
       "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter-source\\\\adapterconfig\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} source configuration."
+      "flavorTextTemplate": "Adapter {{ AdapterName }} data source configuration."
     },
     {
       "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter-source\\\\adapterconfig\\.template\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} configuration template."
+      "flavorTextTemplate": "Adapter {{ AdapterName }} data configuration template."
     },
     {
       "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter-source\\\\component-package-manifest\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} source manifest."
+      "flavorTextTemplate": "Adapter {{ AdapterName }} data source manifest."
     },
     {
       "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter-source\\\\sdk-metadata\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} source metadata."
+      "flavorTextTemplate": "Adapter {{ AdapterName }} data source metadata."
     },
     {
-      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\bin\\\\agent\\.cfg$",
+      "regex": "^C:\\\\TAMS\\\\Agent?$",
+      "flavorTextTemplate": "Organizer for MTConnect agent installations."
+    },
+    {
+      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)?$",
+      "flavorTextTemplate": "MTConnect agent {{ AgentName }} installation folder."
+    },
+    {
+      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\bin?$",
+      "flavorTextTemplate": "MTConnect agent {{ AgentName }} EXE folder."
+    },
+    {
+      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\[Bb]in\\\\agent\\.cfg$",
       "flavorTextTemplate": "MTConnect agent {{ AgentName }} configuration."
     },
     {
-      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\bin\\\\agent\\.exe$",
+      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\[Bb]in\\\\agent\\.exe$",
       "flavorTextTemplate": "MTConnect agent {{ AgentName }} executable."
     },
     {
-      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\devices\\\\Devices\\.xml$",
-      "flavorTextTemplate": "MTConnect agent {{ AgentName }} device definitions."
+      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\[Dd]evices?$",
+      "flavorTextTemplate": "Organizer folder MTConnect agent {{ AgentName }} device definitions."
+    },
+    {
+      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\[Dd]evices\\\\Devices\\.xml$",
+      "flavorTextTemplate": "MTConnect agent {{ AgentName }} device definition."
     }
   ]
 }
