@@ -159,7 +159,7 @@ namespace PathStructure
 
             boundaries.Add(remainingPath.Length);
 
-            for (var index = boundaries.Count - 1; index >= 0; index--)
+            for (var index = 0; index < boundaries.Count; index++)
             {
                 yield return boundaries[index];
             }

@@ -12,7 +12,7 @@ namespace PathStructure
     /// </summary>
     public static class PathStructureConfigLoader
     {
-        private const string RootPattern = "^";
+        private const string RootPattern = ".*+";
         private static readonly Regex NamedGroupRegex = new Regex(@"\(\?<(?<name>[A-Za-z][A-Za-z0-9_]*)>", RegexOptions.Compiled);
         private static readonly Regex TemplateTokenRegex = new Regex(@"\{\{\s*(?<name>[^}]+)\s*\}\}", RegexOptions.Compiled);
 
