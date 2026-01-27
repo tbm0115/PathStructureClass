@@ -11,6 +11,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const listElement = document.getElementById('path-structure-list');
   const emptyState = document.getElementById('empty-state');
   const countElement = document.getElementById('child-count');
+  const childPanel = document.getElementById('child-panel');
+  const searchInput = document.getElementById('child-search');
+  const addPathButton = document.getElementById('add-path');
+  const modalOverlay = document.getElementById('modal-overlay');
+  const addPathForm = document.getElementById('add-path-form');
+  const closeModalButton = document.getElementById('close-modal');
+  const cancelAddButton = document.getElementById('cancel-add');
+  const toggleServiceButton = document.getElementById('toggle-service');
+
+  let allChildren = [];
+  let currentSearch = '';
+  let isConnected = false;
 
   const severityOrder = {
     warning: 1,
@@ -22,9 +34,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!statusElement || !statusMessage) {
       return;
     }
-    statusElement.textContent = status.connected ? 'Connected' : 'Disconnected';
-    statusElement.dataset.connected = String(Boolean(status.connected));
+    isConnected = Boolean(status.connected);
+    statusElement.textContent = isConnected ? 'Connected' : 'Disconnected';
+    statusElement.dataset.connected = String(isConnected);
     statusMessage.textContent = status.message || 'Watcher status updated.';
+    if (toggleServiceButton) {
+      toggleServiceButton.textContent = isConnected ? 'Stop service' : 'Start service';
+    }
+    if (status.errorDetails) {
+      console.error(status.errorDetails);
+    }
   };
 
   const getMaxSeverity = (exceptions) => {
@@ -48,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const name = document.createElement('span');
     name.className = 'path-name';
-    name.textContent = child.displayName;
+    name.textContent = child.literalPath || child.displayName;
 
     if (child.isRequired) {
       const badge = document.createElement('span');
@@ -80,16 +99,57 @@ document.addEventListener('DOMContentLoaded', () => {
     listElement.appendChild(item);
   };
 
-  const updateList = (payload) => {
+  const renderList = () => {
     if (!listElement) {
       return;
     }
 
     listElement.innerHTML = '';
+    const filtered = allChildren.filter((child) => {
+      if (!currentSearch) {
+        return true;
+      }
+      const query = currentSearch.toLowerCase();
+      return (
+        child.literalPath?.toLowerCase().includes(query) ||
+        child.displayName?.toLowerCase().includes(query) ||
+        child.flavorText?.toLowerCase().includes(query)
+      );
+    });
+
+    if (countElement) {
+      countElement.textContent = `${filtered.length} item${filtered.length === 1 ? '' : 's'}`;
+    }
+
+    if (filtered.length === 0) {
+      if (emptyState) {
+        emptyState.hidden = false;
+      }
+      return;
+    }
+
+    if (emptyState) {
+      emptyState.hidden = true;
+    }
+
+    filtered.forEach(renderChild);
+  };
+
+  const updateList = (payload) => {
+    if (!listElement) {
+      return;
+    }
 
     const children = payload?.children || [];
-    if (countElement) {
-      countElement.textContent = `${children.length} item${children.length === 1 ? '' : 's'}`;
+    allChildren = children;
+
+    const isFileSelection =
+      Boolean(payload?.trackedPath) &&
+      Boolean(payload?.trackedFolder) &&
+      payload.trackedPath !== payload.trackedFolder;
+
+    if (childPanel) {
+      childPanel.hidden = isFileSelection;
     }
 
     if (trackedPathElement) {
@@ -105,18 +165,24 @@ document.addEventListener('DOMContentLoaded', () => {
       trackedFolderElement.textContent = payload?.trackedFolder || 'Awaiting Explorer selection.';
     }
 
-    if (children.length === 0) {
-      if (emptyState) {
-        emptyState.hidden = false;
-      }
+    renderList();
+  };
+
+  const closeModal = () => {
+    if (!modalOverlay) {
       return;
     }
-
-    if (emptyState) {
-      emptyState.hidden = true;
+    modalOverlay.hidden = true;
+    if (addPathForm) {
+      addPathForm.reset();
     }
+  };
 
-    children.forEach(renderChild);
+  const openModal = () => {
+    if (!modalOverlay) {
+      return;
+    }
+    modalOverlay.hidden = false;
   };
 
   window.pathStructure?.onStatus((status) => {
@@ -126,4 +192,76 @@ document.addEventListener('DOMContentLoaded', () => {
   window.pathStructure?.onPathUpdate((payload) => {
     updateList(payload);
   });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', (event) => {
+      currentSearch = event.target.value.trim();
+      renderList();
+    });
+  }
+
+  if (addPathButton) {
+    addPathButton.addEventListener('click', () => {
+      openModal();
+    });
+  }
+
+  if (closeModalButton) {
+    closeModalButton.addEventListener('click', closeModal);
+  }
+
+  if (cancelAddButton) {
+    cancelAddButton.addEventListener('click', closeModal);
+  }
+
+  if (modalOverlay) {
+    modalOverlay.addEventListener('click', (event) => {
+      if (event.target === modalOverlay) {
+        closeModal();
+      }
+    });
+  }
+
+  if (addPathForm) {
+    addPathForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(addPathForm);
+      const regex = formData.get('regex');
+      if (!regex) {
+        return;
+      }
+      const payload = {
+        regex: String(regex).trim(),
+        name: String(formData.get('name') || '').trim(),
+        flavorTextTemplate: String(formData.get('flavorTextTemplate') || '').trim(),
+        isRequired: formData.get('isRequired') === 'on'
+      };
+
+      try {
+        await window.pathStructure?.sendJsonRpcRequest('addPath', payload);
+        updateStatus({
+          connected: true,
+          message: 'Path added. Reloading configuration...'
+        });
+        await window.pathStructure?.softReset();
+        closeModal();
+      } catch (error) {
+        updateStatus({
+          connected: isConnected,
+          message: 'Unable to update configuration. Please check the configuration file.'
+        });
+        console.error('Add path failed:', error);
+      }
+    });
+  }
+
+  if (toggleServiceButton) {
+    toggleServiceButton.addEventListener('click', async () => {
+      if (isConnected) {
+        await window.pathStructure?.stopService();
+      } else {
+        await window.pathStructure?.startService();
+      }
+    });
+  }
 });

@@ -284,6 +284,27 @@ ipcMain.handle('scaffold-required-folders', async () => {
   return result;
 });
 
+ipcMain.handle('watcher-start', async () => {
+  if (watcherProcess) {
+    sendStatusUpdate({ connected: true, message: 'Watcher host already running.' });
+    return;
+  }
+  await bootWatcherHost();
+});
+
+ipcMain.handle('watcher-stop', () => {
+  stopWatcherHost();
+  sendStatusUpdate({ connected: false, message: 'Watcher host stopped.' });
+});
+
+ipcMain.handle('soft-reset', () => {
+  if (!rpcService) {
+    return;
+  }
+  rpcService.disconnect();
+  connectToWatcherHost();
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();

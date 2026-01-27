@@ -13,18 +13,13 @@
           <h1>PathStructure Client</h1>
           <p class="subtitle">Tracking the most recent Explorer selection for path validation.</p>
         </div>
-        <div class="status-card">
-          <span id="connection-status" data-connected="false">Disconnected</span>
-          <p id="status-message">Waiting for watcher host...</p>
-        </div>
       </header>
 
       <section class="tracked-panel">
         <div>
-          <h2>Tracked selection</h2>
-          <p class="label">Current path</p>
+          <h2>Current selection</h2>
           <p id="tracked-path" class="value">No path selected.</p>
-          <p id="tracked-flavor" class="path-flavor" hidden></p>
+          <p id="tracked-flavor" class="path-flavor muted" hidden></p>
         </div>
         <div>
           <p class="label">Tracked folder</p>
@@ -32,7 +27,7 @@
         </div>
       </section>
 
-      <section class="child-panel">
+      <section class="child-panel" id="child-panel">
         <div class="child-panel-header">
           <div>
             <h2>Immediate child path structures</h2>
@@ -40,10 +35,58 @@
           </div>
           <span id="child-count" class="count-pill">0 items</span>
         </div>
-        <ul id="path-structure-list" class="path-list"></ul>
-        <p id="empty-state" class="empty-state">Select a folder in Explorer to see child path structures.</p>
+        <div class="child-panel-toolbar">
+          <label class="search-field">
+            <span class="sr-only">Search child paths</span>
+            <input id="child-search" type="search" placeholder="Search child paths" />
+          </label>
+          <button id="add-path" class="action-button" type="button">Add path</button>
+        </div>
+        <div class="child-panel-content">
+          <ul id="path-structure-list" class="path-list"></ul>
+          <p id="empty-state" class="empty-state">Select a folder in Explorer to see child path structures.</p>
+        </div>
       </section>
+
+      <footer class="status-bar">
+        <div class="status-info">
+          <span id="connection-status" data-connected="false">Disconnected</span>
+          <p id="status-message">Waiting for watcher host...</p>
+        </div>
+        <button id="toggle-service" class="ghost-button" type="button">Start service</button>
+      </footer>
     </main>
+
+    <div id="modal-overlay" class="modal-overlay" hidden>
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Add path structure</h3>
+          <button id="close-modal" class="icon-button" type="button" aria-label="Close">✕</button>
+        </div>
+        <form id="add-path-form" class="modal-body">
+          <label class="field">
+            <span>Path regex *</span>
+            <input id="path-regex" name="regex" type="text" required />
+          </label>
+          <label class="field">
+            <span>Name</span>
+            <input id="path-name" name="name" type="text" />
+          </label>
+          <label class="field">
+            <span>Flavor text</span>
+            <textarea id="path-flavor" name="flavorTextTemplate" rows="3"></textarea>
+          </label>
+          <label class="checkbox">
+            <input id="path-required" name="isRequired" type="checkbox" />
+            <span>Required</span>
+          </label>
+          <div class="modal-actions">
+            <button id="cancel-add" class="ghost-button" type="button">Cancel</button>
+            <button class="action-button" type="submit">Save path</button>
+          </div>
+        </form>
+      </div>
+    </div>
     <script src="renderer.js"></script>
   </body>
 </html>
