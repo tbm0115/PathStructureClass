@@ -26,6 +26,7 @@ namespace PathStructure.WatcherHost
         private static ExplorerWatcher _watcher;
         private static TcpListener _listener;
         private static PathStructure _pathStructure;
+        private static PathStructureConfig _pathConfig;
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -82,6 +83,7 @@ namespace PathStructure.WatcherHost
                 var rootNode = new PathNode("Root", @"^.*$");
                 config = new PathStructureConfig(rootNode);
             }
+            _pathConfig = config;
             _pathStructure = new PathStructure(config);
 
             _watcher = new ExplorerWatcher(_pathStructure, new ExplorerWatcherOptions
@@ -345,7 +347,7 @@ namespace PathStructure.WatcherHost
         /// </summary>
         private static async Task HandleAddPathCommandAsync(JsonRpcRequest request, NetworkStream stream)
         {
-            if (_pathStructure?.Config == null)
+            if (_pathConfig == null)
             {
                 await SendJsonRpcErrorAsync(stream, request.Id, -32001, "PathStructure is not initialized.", null).ConfigureAwait(false);
                 return;
@@ -364,7 +366,7 @@ namespace PathStructure.WatcherHost
                 return;
             }
 
-            if (_pathStructure.Config.Paths.Any(path => string.Equals(path.Regex, regex, StringComparison.OrdinalIgnoreCase)))
+            if (_pathConfig.Paths.Any(path => string.Equals(path.Regex, regex, StringComparison.OrdinalIgnoreCase)))
             {
                 await SendJsonRpcErrorAsync(stream, request.Id, -32002, "Path regex already exists.", regex).ConfigureAwait(false);
                 return;
@@ -380,8 +382,8 @@ namespace PathStructure.WatcherHost
                 Icon = GetOptionalString(request.Params, "icon")
             };
 
-            _pathStructure.Config.Paths.Add(newPath);
-            if (_pathStructure.Config.Root is PathNode rootNode)
+            _pathConfig.Paths.Add(newPath);
+            if (_pathConfig.Root is PathNode rootNode)
             {
                 rootNode.Children.Add(BuildPathNode(newPath));
             }
