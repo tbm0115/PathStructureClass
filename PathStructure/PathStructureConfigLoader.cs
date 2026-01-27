@@ -104,7 +104,7 @@ namespace PathStructure
                     continue;
                 }
 
-                var name = path.Regex.Trim();
+                var name = string.IsNullOrWhiteSpace(path.Name) ? path.Regex.Trim() : path.Name.Trim();
                 var child = new PathNode(
                     name,
                     path.Regex,
@@ -142,10 +142,12 @@ namespace PathStructure
                 yield return new PathStructurePath
                 {
                     Regex = ApplyNamespaceToRegex(path.Regex, prefix),
+                    Name = path.Name,
                     FlavorTextTemplate = ApplyNamespaceToTemplate(path.FlavorTextTemplate, prefix),
                     BackgroundColor = path.BackgroundColor,
                     ForegroundColor = path.ForegroundColor,
-                    Icon = path.Icon
+                    Icon = path.Icon,
+                    IsRequired = path.IsRequired
                 };
             }
         }

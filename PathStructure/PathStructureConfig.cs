@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using PathStructure.Abstracts;
 
@@ -26,15 +27,21 @@ namespace PathStructure
         /// </summary>
         public IList<PathStructureImport> Imports { get; set; } = new List<PathStructureImport>();
 
+        IReadOnlyList<IPathStructureImport> IPathStructureConfig.Imports => Imports.Cast<IPathStructureImport>().ToList();
+
         /// <summary>
         /// Gets the path patterns configured for this structure.
         /// </summary>
         public IList<PathStructurePath> Paths { get; set; } = new List<PathStructurePath>();
 
+        IReadOnlyList<IPathStructurePath> IPathStructureConfig.Paths => Paths.Cast<IPathStructurePath>().ToList();
+
         /// <summary>
         /// Gets the plugin descriptors configured for this structure.
         /// </summary>
         public IList<PathStructurePlugin> Plugins { get; set; } = new List<PathStructurePlugin>();
+
+        IReadOnlyList<IPathStructurePlugin> IPathStructureConfig.Plugins => Plugins.Cast<IPathStructurePlugin>().ToList();
 
         /// <inheritdoc />
         public IPathNode Root { get; private set; }
