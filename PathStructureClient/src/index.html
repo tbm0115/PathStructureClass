@@ -8,41 +8,46 @@
   </head>
   <body>
     <main>
-      <header class="app-header">
-        <div>
-          <h1>PathStructure Client</h1>
-          <p class="subtitle">Tracking the most recent Explorer selection for path validation.</p>
-        </div>
-        <div class="status-card">
-          <span id="connection-status" data-connected="false">Disconnected</span>
-          <p id="status-message">Waiting for watcher host...</p>
-        </div>
-      </header>
-
       <section class="tracked-panel">
         <div>
-          <h2>Tracked selection</h2>
-          <p class="label">Current path</p>
+          <h2>Current selection</h2>
           <p id="tracked-path" class="value">No path selected.</p>
-          <p id="tracked-flavor" class="path-flavor" hidden></p>
+          <p id="tracked-flavor" class="path-flavor muted" hidden></p>
         </div>
-        <div>
+        <div id="tracked-folder-group">
           <p class="label">Tracked folder</p>
           <p id="tracked-folder" class="value">Awaiting Explorer selection.</p>
         </div>
       </section>
 
-      <section class="child-panel">
+      <section class="child-panel" id="child-panel">
         <div class="child-panel-header">
           <div>
-            <h2>Immediate child path structures</h2>
-            <p class="subtitle">Files and folders expected directly beneath the tracked folder.</p>
+            <h2>Child structures</h2>
+            <p class="subtitle">Items expected directly beneath the tracked folder.</p>
           </div>
           <span id="child-count" class="count-pill">0 items</span>
         </div>
-        <ul id="path-structure-list" class="path-list"></ul>
-        <p id="empty-state" class="empty-state">Select a folder in Explorer to see child path structures.</p>
+        <div class="child-panel-toolbar">
+          <label class="search-field">
+            <span class="sr-only">Search child paths</span>
+            <input id="child-search" type="search" placeholder="Search child paths" />
+          </label>
+          <button id="add-path" class="action-button" type="button">Add path</button>
+        </div>
+        <div class="child-panel-content">
+          <ul id="path-structure-list" class="path-list"></ul>
+          <p id="empty-state" class="empty-state">Select a folder in Explorer to see child path structures.</p>
+        </div>
       </section>
+
+      <footer class="status-bar">
+        <div class="status-info">
+          <span id="connection-status" data-connected="false">Disconnected</span>
+          <p id="status-message">Waiting for watcher host...</p>
+        </div>
+        <button id="toggle-service" class="ghost-button" type="button">Start service</button>
+      </footer>
     </main>
     <script src="renderer.js"></script>
   </body>

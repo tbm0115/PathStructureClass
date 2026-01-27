@@ -134,13 +134,15 @@ class PathStructureService extends EventEmitter {
       case 'watcherError':
         this.emit('status', {
           connected: true,
-          message: payload?.params?.message || 'Watcher error reported.'
+          message: payload?.params?.message || 'Watcher error reported.',
+          errorDetails: payload?.params?.error || null
         });
         break;
       case 'watcherAborted':
         this.emit('status', {
           connected: false,
-          message: payload?.params?.message || 'Watcher aborted.'
+          message: payload?.params?.message || 'Watcher aborted.',
+          errorDetails: payload?.params?.error || null
         });
         break;
       case 'pathChanged':
@@ -176,6 +178,7 @@ class PathStructureService extends EventEmitter {
     this.state.children = children;
     this.emit('update', {
       trackedPath: this.state.trackedPath,
+      trackedName: this.state.currentMatch.nodeName,
       trackedFolder: this.state.trackedFolder,
       currentFlavorText: this.buildCurrentFlavorText(),
       children: this.state.children
@@ -343,6 +346,11 @@ class PathStructureService extends EventEmitter {
     }
 
     const displayName = matchedEntry?.name || nodeName || sanitizeName(pattern);
+    const literalPath =
+      matchedEntry?.fullPath ||
+      (trackedFolder && displayName ? path.join(trackedFolder, displayName) : null) ||
+      pattern ||
+      displayName;
     const templateMatch = matchedEntryResult || fallbackMatch || lineageMatch;
     const flavorText = templateMatch?.groups
       ? renderTemplate(flavorTextTemplate, templateMatch)
@@ -350,6 +358,7 @@ class PathStructureService extends EventEmitter {
 
     return {
       displayName,
+      literalPath,
       flavorText,
       pattern,
       isRequired,

@@ -8,9 +8,18 @@ document.addEventListener('DOMContentLoaded', () => {
   const trackedPathElement = document.getElementById('tracked-path');
   const trackedFlavorElement = document.getElementById('tracked-flavor');
   const trackedFolderElement = document.getElementById('tracked-folder');
+  const trackedFolderGroup = document.getElementById('tracked-folder-group');
   const listElement = document.getElementById('path-structure-list');
   const emptyState = document.getElementById('empty-state');
   const countElement = document.getElementById('child-count');
+  const childPanel = document.getElementById('child-panel');
+  const searchInput = document.getElementById('child-search');
+  const addPathButton = document.getElementById('add-path');
+  const toggleServiceButton = document.getElementById('toggle-service');
+
+  let allChildren = [];
+  let currentSearch = '';
+  let isConnected = false;
 
   const severityOrder = {
     warning: 1,
@@ -22,9 +31,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!statusElement || !statusMessage) {
       return;
     }
-    statusElement.textContent = status.connected ? 'Connected' : 'Disconnected';
-    statusElement.dataset.connected = String(Boolean(status.connected));
+    isConnected = Boolean(status.connected);
+    statusElement.textContent = isConnected ? 'Connected' : 'Disconnected';
+    statusElement.dataset.connected = String(isConnected);
     statusMessage.textContent = status.message || 'Watcher status updated.';
+    if (toggleServiceButton) {
+      toggleServiceButton.textContent = isConnected ? 'Stop service' : 'Start service';
+    }
+    if (status.errorDetails) {
+      console.error(status.errorDetails);
+    }
   };
 
   const getMaxSeverity = (exceptions) => {
@@ -48,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const name = document.createElement('span');
     name.className = 'path-name';
-    name.textContent = child.displayName;
+    name.textContent = child.displayName || child.literalPath;
 
     if (child.isRequired) {
       const badge = document.createElement('span');
@@ -80,20 +96,61 @@ document.addEventListener('DOMContentLoaded', () => {
     listElement.appendChild(item);
   };
 
-  const updateList = (payload) => {
+  const renderList = () => {
     if (!listElement) {
       return;
     }
 
     listElement.innerHTML = '';
+    const filtered = allChildren.filter((child) => {
+      if (!currentSearch) {
+        return true;
+      }
+      const query = currentSearch.toLowerCase();
+      return (
+        child.literalPath?.toLowerCase().includes(query) ||
+        child.displayName?.toLowerCase().includes(query) ||
+        child.flavorText?.toLowerCase().includes(query)
+      );
+    });
+
+    if (countElement) {
+      countElement.textContent = `${filtered.length} item${filtered.length === 1 ? '' : 's'}`;
+    }
+
+    if (filtered.length === 0) {
+      if (emptyState) {
+        emptyState.hidden = false;
+      }
+      return;
+    }
+
+    if (emptyState) {
+      emptyState.hidden = true;
+    }
+
+    filtered.forEach(renderChild);
+  };
+
+  const updateList = (payload) => {
+    if (!listElement) {
+      return;
+    }
 
     const children = payload?.children || [];
-    if (countElement) {
-      countElement.textContent = `${children.length} item${children.length === 1 ? '' : 's'}`;
+    allChildren = children;
+
+    const isFileSelection =
+      Boolean(payload?.trackedPath) &&
+      Boolean(payload?.trackedFolder) &&
+      payload.trackedPath !== payload.trackedFolder;
+
+    if (childPanel) {
+      childPanel.hidden = isFileSelection;
     }
 
     if (trackedPathElement) {
-      trackedPathElement.textContent = payload?.trackedPath || 'No path selected.';
+      trackedPathElement.textContent = payload?.trackedName || payload?.trackedPath || 'No path selected.';
     }
 
     if (trackedFlavorElement) {
@@ -105,18 +162,13 @@ document.addEventListener('DOMContentLoaded', () => {
       trackedFolderElement.textContent = payload?.trackedFolder || 'Awaiting Explorer selection.';
     }
 
-    if (children.length === 0) {
-      if (emptyState) {
-        emptyState.hidden = false;
-      }
-      return;
+    if (trackedFolderGroup) {
+      trackedFolderGroup.hidden =
+        !payload?.trackedFolder ||
+        (payload?.trackedPath && payload?.trackedFolder && payload.trackedPath === payload.trackedFolder);
     }
 
-    if (emptyState) {
-      emptyState.hidden = true;
-    }
-
-    children.forEach(renderChild);
+    renderList();
   };
 
   window.pathStructure?.onStatus((status) => {
@@ -126,4 +178,27 @@ document.addEventListener('DOMContentLoaded', () => {
   window.pathStructure?.onPathUpdate((payload) => {
     updateList(payload);
   });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', (event) => {
+      currentSearch = event.target.value.trim();
+      renderList();
+    });
+  }
+
+  if (addPathButton) {
+    addPathButton.addEventListener('click', () => {
+      window.pathStructure?.openAddPathWindow();
+    });
+  }
+
+  if (toggleServiceButton) {
+    toggleServiceButton.addEventListener('click', async () => {
+      if (isConnected) {
+        await window.pathStructure?.stopService();
+      } else {
+        await window.pathStructure?.startService();
+      }
+    });
+  }
 });

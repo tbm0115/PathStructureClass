@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Path Structure</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="add-path-body">
+    <main class="modal-window">
+      <section class="modal">
+        <div class="modal-header">
+          <h3>Add path structure</h3>
+          <button id="close-window" class="icon-button" type="button" aria-label="Close">✕</button>
+        </div>
+        <form id="add-path-form" class="modal-body">
+          <label class="field">
+            <span>Path regex *</span>
+            <input id="path-regex" name="regex" type="text" required />
+            <small class="helper-text">Need help? Regex tools like regex101.com can help validate your pattern.</small>
+          </label>
+          <label class="field">
+            <span>Name</span>
+            <input id="path-name" name="name" type="text" />
+            <small class="helper-text">Used as the display name when showing the child path structure.</small>
+          </label>
+          <label class="field">
+            <span>Flavor text</span>
+            <textarea id="path-flavor" name="flavorTextTemplate" rows="3"></textarea>
+            <small class="helper-text">
+              Templates can use named capture groups from the regex, like <code>{{project}}</code>.
+            </small>
+          </label>
+          <label class="checkbox">
+            <input id="path-required" name="isRequired" type="checkbox" />
+            <span>Required</span>
+            <small class="helper-text">Required paths are flagged when missing under the tracked folder.</small>
+          </label>
+          <div class="modal-actions">
+            <button id="cancel-add" class="ghost-button" type="button">Cancel</button>
+            <button class="action-button" type="submit">Save path</button>
+          </div>
+        </form>
+      </section>
+    </main>
+    <script src="add-path.js"></script>
+  </body>
+</html>

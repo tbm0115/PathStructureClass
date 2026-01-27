@@ -9,6 +9,7 @@ const watcherPort = Number.parseInt(process.env.PATHSTRUCTURE_WATCHER_PORT || '4
 const watcherProcessName = 'PathStructure.WatcherHost.exe';
 
 let mainWindow;
+let addPathWindow;
 let tray;
 let watcherProcess;
 let reconnectTimer;
@@ -18,8 +19,8 @@ let scaffoldMenuItem;
 
 const createWindow = () => {
   const win = new BrowserWindow({
-    width: 900,
-    height: 650,
+    width: 620,
+    height: 900,
     alwaysOnTop: true,
     show: false,
     autoHideMenuBar: false,
@@ -46,6 +47,35 @@ const createWindow = () => {
   });
 
   return win;
+};
+
+const createAddPathWindow = () => {
+  if (addPathWindow) {
+    addPathWindow.focus();
+    return addPathWindow;
+  }
+
+  addPathWindow = new BrowserWindow({
+    width: 420,
+    height: 650,
+    resizable: false,
+    show: false,
+    parent: mainWindow ?? undefined,
+    modal: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'src', 'preload.js')
+    }
+  });
+
+  addPathWindow.loadFile(path.join(__dirname, 'src', 'add-path.html'));
+  addPathWindow.once('ready-to-show', () => addPathWindow.show());
+  addPathWindow.on('closed', () => {
+    addPathWindow = null;
+  });
+
+  return addPathWindow;
 };
 
 const hideToTray = () => {
@@ -282,6 +312,35 @@ ipcMain.handle('scaffold-required-folders', async () => {
   const result = await pathStructureService.scaffoldRequiredFolders();
   sendStatusUpdate({ connected: true, message: result.message });
   return result;
+});
+
+ipcMain.handle('watcher-start', async () => {
+  if (watcherProcess) {
+    sendStatusUpdate({ connected: true, message: 'Watcher host already running.' });
+    return;
+  }
+  await bootWatcherHost();
+});
+
+ipcMain.handle('watcher-stop', () => {
+  stopWatcherHost();
+  sendStatusUpdate({ connected: false, message: 'Watcher host stopped.' });
+});
+
+ipcMain.handle('soft-reset', () => {
+  if (!rpcService) {
+    return;
+  }
+  rpcService.disconnect();
+  connectToWatcherHost();
+});
+
+ipcMain.handle('open-add-path-window', () => {
+  createAddPathWindow();
+});
+
+ipcMain.handle('client-status', (_event, status) => {
+  sendStatusUpdate(status);
 });
 
 app.on('window-all-closed', () => {
