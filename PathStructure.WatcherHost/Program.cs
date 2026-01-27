@@ -209,6 +209,7 @@ namespace PathStructure.WatcherHost
         private static void OnExplorerFound(string url)
         {
             var matchSummary = FindClosestMatches(url);
+            var childMatches = FindImmediateChildMatches(url, matchSummary);
 #if DEBUG
             LogMatches(url, matchSummary);
 #endif
@@ -220,6 +221,17 @@ namespace PathStructure.WatcherHost
                 {
                     message = "Explorer path changed.",
                     path = url,
+                    immediateChildMatches = childMatches.Select(match => new
+                    {
+                        match.NodeName,
+                        match.Pattern,
+                        match.MatchedValue,
+                        match.MatchLength,
+                        match.FlavorTextTemplate,
+                        match.BackgroundColor,
+                        match.ForegroundColor,
+                        match.Icon
+                    }).ToArray(),
                     timestamp = DateTimeOffset.Now.ToString("o")
                 }
             });
@@ -482,6 +494,69 @@ namespace PathStructure.WatcherHost
             var parentFolderPath = GetParentPath(url);
             var parentFolderInfo = FindNearestParentMatches(nodes, parentFolderPath, IsFolderRegex);
             return new MatchSummary(Array.Empty<PathPatternMatch>(), folderMatches, parentFolderInfo.Matches, parentFolderInfo.MatchedPath);
+        }
+
+        /// <summary>
+        /// Finds immediate child path structures for the current selection.
+        /// </summary>
+        private static IReadOnlyList<PathPatternMatch> FindImmediateChildMatches(string url, MatchSummary summary)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return Array.Empty<PathPatternMatch>();
+            }
+
+            var baseNodes = summary?.FileMatches.Count > 0 ? summary.FileMatches : summary?.FolderMatches;
+            if (baseNodes == null || baseNodes.Count == 0)
+            {
+                return Array.Empty<PathPatternMatch>();
+            }
+
+            var nodes = EnumerateMatchNodes().ToList();
+            if (nodes.Count == 0)
+            {
+                return Array.Empty<PathPatternMatch>();
+            }
+
+            var options = _pathStructure?.Config?.RegexOptions ?? RegexOptions.None;
+            var childMatches = new List<PathPatternMatch>();
+
+            foreach (var baseMatch in baseNodes)
+            {
+                if (string.IsNullOrWhiteSpace(baseMatch.MatchedValue))
+                {
+                    continue;
+                }
+
+                var baseIndex = nodes.FindIndex(node =>
+                    string.Equals(node.Name, baseMatch.NodeName, StringComparison.Ordinal) &&
+                    string.Equals(node.Pattern, baseMatch.Pattern, StringComparison.Ordinal));
+                if (baseIndex < 0)
+                {
+                    continue;
+                }
+
+                var baseNode = nodes[baseIndex];
+                foreach (var child in baseNode.Children ?? Array.Empty<IPathNode>())
+                {
+                    var regex = child.GetRegex(options);
+                    var match = regex.Match(url);
+                    if (!match.Success)
+                    {
+                        continue;
+                    }
+
+                    childMatches.Add(BuildPatternMatch(child, match));
+                }
+            }
+
+            if (childMatches.Count == 0)
+            {
+                return Array.Empty<PathPatternMatch>();
+            }
+
+            var bestLength = childMatches.Max(item => item.MatchLength);
+            return childMatches.Where(item => item.MatchLength == bestLength).ToArray();
         }
 
         /// <summary>
