@@ -508,7 +508,15 @@ namespace PathStructure.WatcherHost
                 return Array.Empty<PathPatternMatch>();
             }
 
-            var baseNodes = summary?.FileMatches.Count > 0 ? summary.FileMatches : summary?.FolderMatches;
+            IReadOnlyList<PathPatternMatch> baseNodes = null;
+            if (summary?.FileMatches.Count > 0)
+            {
+                baseNodes = summary.ParentFolderMatches.Count > 0 ? summary.ParentFolderMatches : summary.FileMatches;
+            }
+            else if (summary?.FolderMatches.Count > 0)
+            {
+                baseNodes = summary.FolderMatches;
+            }
             if (baseNodes == null || baseNodes.Count == 0)
             {
                 return Array.Empty<PathPatternMatch>();
@@ -543,12 +551,7 @@ namespace PathStructure.WatcherHost
                 {
                     var regex = child.GetRegex(options);
                     var match = regex.Match(url);
-                    if (!match.Success)
-                    {
-                        continue;
-                    }
-
-                    childMatches.Add(BuildPatternMatch(child, match));
+                    childMatches.Add(match.Success ? BuildPatternMatch(child, match) : BuildPatternMatch(child));
                 }
             }
 
@@ -558,6 +561,10 @@ namespace PathStructure.WatcherHost
             }
 
             var bestLength = childMatches.Max(item => item.MatchLength);
+            if (bestLength == 0)
+            {
+                return childMatches.ToArray();
+            }
             return childMatches.Where(item => item.MatchLength == bestLength).ToArray();
         }
 
@@ -786,6 +793,21 @@ namespace PathStructure.WatcherHost
                 node?.Pattern,
                 match?.Value,
                 match?.Value?.Length ?? 0,
+                metadata?.FlavorTextTemplate,
+                metadata?.BackgroundColor,
+                metadata?.ForegroundColor,
+                metadata?.Icon,
+                metadata?.IsRequired ?? false);
+        }
+
+        private static PathPatternMatch BuildPatternMatch(IPathNode node)
+        {
+            var metadata = node as PathNode;
+            return new PathPatternMatch(
+                node?.Name,
+                node?.Pattern,
+                null,
+                0,
                 metadata?.FlavorTextTemplate,
                 metadata?.BackgroundColor,
                 metadata?.ForegroundColor,

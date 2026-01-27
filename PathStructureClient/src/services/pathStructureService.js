@@ -12,6 +12,32 @@ const getSeverityRank = (severity) => severityOrder[severity] || 0;
 
 const normalizePath = (value) => (value ? value.replace(/\//g, '\\') : value);
 
+const buildGroupCaptureRegex = (pattern) => {
+  if (!pattern) {
+    return null;
+  }
+  const groupRegex = /\(\?<[^>]+>/g;
+  const matches = [...pattern.matchAll(groupRegex)];
+  if (matches.length === 0) {
+    return null;
+  }
+  const lastGroup = matches[matches.length - 1];
+  const startIndex = lastGroup.index ?? 0;
+  const closeIndex = pattern.indexOf(')', startIndex);
+  if (closeIndex === -1) {
+    return null;
+  }
+  const prefix = pattern.slice(0, closeIndex + 1);
+  return `${prefix}.*$`;
+};
+
+const tryMatchAgainstPath = (regex, pathValue) => {
+  if (!regex || !pathValue) {
+    return null;
+  }
+  return regex.exec(pathValue) || regex.exec(normalizePath(pathValue));
+};
+
 const renderTemplate = (template, match) => {
   if (!template) {
     return '';
@@ -126,7 +152,9 @@ class PathStructureService extends EventEmitter {
     this.state.trackedFolder = trackedFolder;
 
     const entries = await this.readDirectoryEntries(trackedFolder);
-    const children = this.state.rawChildren.map((child) => this.buildChildState(child, entries, trackedFolder));
+    const children = this.state.rawChildren.map((child) =>
+      this.buildChildState(child, entries, trackedFolder, this.state.trackedPath)
+    );
 
     this.state.children = children;
     this.emit('update', {
@@ -212,7 +240,7 @@ class PathStructureService extends EventEmitter {
     }
   }
 
-  buildChildState(child, entryInfo, trackedFolder) {
+  buildChildState(child, entryInfo, trackedFolder, trackedPath) {
     const nodeName = child?.NodeName || child?.nodeName || child?.name;
     const pattern = child?.Pattern || child?.pattern || '';
     const flavorTextTemplate = child?.FlavorTextTemplate || child?.flavorTextTemplate || '';
@@ -259,6 +287,22 @@ class PathStructureService extends EventEmitter {
       fallbackMatch = regex.exec(matchedValue);
     }
 
+    let lineageMatch = null;
+    if (!matchedEntryResult && !fallbackMatch && regex) {
+      lineageMatch = tryMatchAgainstPath(regex, trackedFolder) || tryMatchAgainstPath(regex, trackedPath);
+      if (!lineageMatch) {
+        const relaxedPattern = buildGroupCaptureRegex(pattern);
+        if (relaxedPattern) {
+          try {
+            const relaxedRegex = new RegExp(relaxedPattern);
+            lineageMatch = tryMatchAgainstPath(relaxedRegex, trackedFolder) || tryMatchAgainstPath(relaxedRegex, trackedPath);
+          } catch (error) {
+            exceptions.push({ severity: 'warning', message: 'Unable to loosen regex for group extraction.' });
+          }
+        }
+      }
+    }
+
     const exists = Boolean(matchedEntry);
     const isFile = matchedEntry ? matchedEntry.isFile : looksLikeFilePattern(pattern);
 
@@ -269,7 +313,7 @@ class PathStructureService extends EventEmitter {
     }
 
     const displayName = matchedEntry?.name || nodeName || sanitizeName(pattern);
-    const flavorText = renderTemplate(flavorTextTemplate, matchedEntryResult || fallbackMatch);
+    const flavorText = renderTemplate(flavorTextTemplate, matchedEntryResult || fallbackMatch || lineageMatch);
 
     return {
       displayName,

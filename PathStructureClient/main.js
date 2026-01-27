@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, MenuItem, Tray, ipcMain, nativeImage } = require('electron');
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -14,6 +14,7 @@ let watcherProcess;
 let reconnectTimer;
 let rpcService;
 let pathStructureService;
+let scaffoldMenuItem;
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -95,20 +96,23 @@ const createTray = async () => {
 };
 
 const createAppMenu = () => {
+  scaffoldMenuItem = new MenuItem({
+    label: 'Scaffold Folders',
+    enabled: false,
+    click: async () => {
+      if (!pathStructureService) {
+        return;
+      }
+      const result = await pathStructureService.scaffoldRequiredFolders();
+      sendStatusUpdate({ connected: true, message: result.message });
+    }
+  });
+
   const template = [
     {
       label: 'Edit',
       submenu: [
-        {
-          label: 'Scaffold Folders',
-          click: async () => {
-            if (!pathStructureService) {
-              return;
-            }
-            const result = await pathStructureService.scaffoldRequiredFolders();
-            sendStatusUpdate({ connected: true, message: result.message });
-          }
-        }
+        scaffoldMenuItem
       ]
     }
   ];
@@ -196,6 +200,10 @@ const sendStatusUpdate = (status) => {
 const sendPathUpdate = (payload) => {
   if (mainWindow && mainWindow.webContents) {
     mainWindow.webContents.send('pathstructure-update', payload);
+  }
+  if (scaffoldMenuItem) {
+    const children = payload?.children || [];
+    scaffoldMenuItem.enabled = children.some((child) => child.isRequired && !child.isFile);
   }
 };
 
