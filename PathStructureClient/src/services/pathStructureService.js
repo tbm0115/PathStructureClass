@@ -12,6 +12,19 @@ const getSeverityRank = (severity) => severityOrder[severity] || 0;
 
 const normalizePath = (value) => (value ? value.replace(/\//g, '\\') : value);
 
+const renderTemplate = (template, match) => {
+  if (!template) {
+    return '';
+  }
+  if (!match?.groups) {
+    return template;
+  }
+  return template.replace(/\{\{\s*([^}\s]+)\s*\}\}/g, (_token, key) => {
+    const value = match.groups[key];
+    return value ?? '';
+  });
+};
+
 const extractGroupNames = (pattern) => {
   if (!pattern) {
     return [];
@@ -99,7 +112,12 @@ class PathStructureService extends EventEmitter {
 
   async handlePathChanged(params) {
     this.state.trackedPath = params?.path || null;
-    this.state.rawChildren = Array.isArray(params?.immediateChildMatches) ? params.immediateChildMatches : [];
+    const immediateChildren =
+      params?.immediateChildMatches ||
+      params?.ImmediateChildMatches ||
+      params?.immediateChildren ||
+      params?.children;
+    this.state.rawChildren = Array.isArray(immediateChildren) ? immediateChildren : [];
     await this.refreshValidation();
   }
 
@@ -199,6 +217,7 @@ class PathStructureService extends EventEmitter {
     const pattern = child?.Pattern || child?.pattern || '';
     const flavorTextTemplate = child?.FlavorTextTemplate || child?.flavorTextTemplate || '';
     const isRequired = Boolean(child?.isRequired ?? child?.IsRequired);
+    const matchedValue = child?.MatchedValue || child?.matchedValue || '';
     const icon = child?.Icon || child?.icon || null;
     const backgroundColor = child?.BackgroundColor || child?.backgroundColor || null;
     const foregroundColor = child?.ForegroundColor || child?.foregroundColor || null;
@@ -223,10 +242,21 @@ class PathStructureService extends EventEmitter {
     }
 
     let matchedEntry = null;
+    let matchedEntryResult = null;
     if (regex && entryInfo?.entries?.length) {
-      matchedEntry = entryInfo.entries.find((entry) =>
-        regex.test(entry.fullPath) || regex.test(normalizePath(entry.fullPath))
-      );
+      matchedEntry = entryInfo.entries.find((entry) => {
+        matchedEntryResult = regex.exec(entry.fullPath);
+        if (matchedEntryResult?.length) {
+          return true;
+        }
+        matchedEntryResult = regex.exec(normalizePath(entry.fullPath));
+        return Boolean(matchedEntryResult?.length);
+      });
+    }
+
+    let fallbackMatch = null;
+    if (!matchedEntryResult && regex && matchedValue) {
+      fallbackMatch = regex.exec(matchedValue);
     }
 
     const exists = Boolean(matchedEntry);
@@ -239,10 +269,11 @@ class PathStructureService extends EventEmitter {
     }
 
     const displayName = matchedEntry?.name || nodeName || sanitizeName(pattern);
+    const flavorText = renderTemplate(flavorTextTemplate, matchedEntryResult || fallbackMatch);
 
     return {
       displayName,
-      flavorText: flavorTextTemplate,
+      flavorText,
       pattern,
       isRequired,
       icon,
