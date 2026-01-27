@@ -20,7 +20,7 @@ let scaffoldMenuItem;
 const createWindow = () => {
   const win = new BrowserWindow({
     width: 620,
-    height: 490,
+    height: 900,
     alwaysOnTop: true,
     show: false,
     autoHideMenuBar: false,

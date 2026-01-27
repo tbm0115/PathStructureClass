@@ -178,6 +178,7 @@ class PathStructureService extends EventEmitter {
     this.state.children = children;
     this.emit('update', {
       trackedPath: this.state.trackedPath,
+      trackedName: this.state.currentMatch.nodeName,
       trackedFolder: this.state.trackedFolder,
       currentFlavorText: this.buildCurrentFlavorText(),
       children: this.state.children

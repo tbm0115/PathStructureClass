@@ -1,6 +1,7 @@
 {
   "paths": [
     {
+			"name": "TAMS integration folder",
       "regex": "^C:\\\\TAMS?$",
       "isRequired": true,
       "flavorTextTemplate": "TAMS MTConnect integration folder.",
@@ -11,15 +12,18 @@
           "flavorTextTemplate": "MTConnect manifest for the TAMS installation."
         },
         {
+					"name": "Integration maintenance tools folder",
           "regex": "^Tools?$",
           "flavorTextTemplate": "Shared tooling for TAMS integrations."
         },
         {
-          "regex": "^Adapter?$",
+					"name": "Adapters Folder",
+          "regex": "^Adapter[s]?$",
           "isRequired": true,
           "flavorTextTemplate": "Organizer folder for adapter installations.",
           "paths": [
             {
+							"name": "Adapter install folder",
               "regex": "^(?<AdapterName>[^\\\\]+)$",
               "flavorTextTemplate": "Adapter {{ AdapterName }} installation folder.",
               "paths": [
@@ -39,6 +43,7 @@
                   "flavorTextTemplate": "Adapter {{ AdapterName }} SDK metadata."
                 },
                 {
+									"name": "Adapter imports folder",
                   "regex": "^Imports?$",
                   "isRequired": true,
                   "flavorTextTemplate": "Adapter {{ AdapterName }} SDK imports folder.",
@@ -61,15 +66,18 @@
                       ]
                     },
                     {
+											"name": "Adapter Source library folder",
                       "regex": "^adapter-source?$",
                       "isRequired": true,
                       "flavorTextTemplate": "Adapter {{ AdapterName }} data source configuration folder.",
                       "paths": [
                         {
+													"name": "Adapter config",
                           "regex": "^adapterconfig\\.json$",
                           "flavorTextTemplate": "Adapter {{ AdapterName }} data source configuration."
                         },
                         {
+													"name": "Adapter config template",
                           "regex": "^adapterconfig\\.template\\.json$",
                           "flavorTextTemplate": "Adapter {{ AdapterName }} data configuration template."
                         },
@@ -92,46 +100,53 @@
           ]
         },
         {
-          "regex": "^Agent?$",
+					"name": "Agents folder",
+          "regex": "^Agent[s]?$",
           "isRequired": true,
           "flavorTextTemplate": "Organizer for MTConnect agent installations.",
           "paths": [
             {
+							"name": "Agent install folder",
               "regex": "^(?<AgentName>[^\\\\]+)?$",
-              "flavorTextTemplate": "MTConnect agent {{ AgentName }} installation folder.",
+              "flavorTextTemplate": "{{ AgentName }} MTConnect agent installation folder.",
               "paths": [
                 {
                   "regex": "^[Bb]in?$",
                   "isRequired": true,
-                  "flavorTextTemplate": "MTConnect agent {{ AgentName }} EXE folder.",
+                  "flavorTextTemplate": "{{ AgentName }} MTConnect agent EXE folder.",
                   "paths": [
                     {
+											"name": "Agent configuration",
                       "regex": "^agent\\.cfg$",
                       "isRequired": true,
-                      "flavorTextTemplate": "MTConnect agent {{ AgentName }} configuration."
+                      "flavorTextTemplate": "{{ AgentName }} MTConnect agent configuration."
                     },
                     {
+											"name": "Agent executable",
                       "regex": "^agent\\.exe$",
                       "isRequired": true,
-                      "flavorTextTemplate": "MTConnect agent {{ AgentName }} executable."
+                      "flavorTextTemplate": "{{ AgentName }} MTConnect agent executable."
                     },
                     {
+											"name": "Agent log",
                       "regex": "^agent(_(.*))?\\.log$",
-                      "flavorTextTemplate": "MTConnect agent {{ AgentName }} log file."
+                      "flavorTextTemplate": "{{ AgentName }} MTConnect agent log file."
                     }
                   ]
                 },
                 {
                   "regex": "^[Dd]evices?$",
-                  "flavorTextTemplate": "Organizer folder MTConnect agent {{ AgentName }} device definitions.",
+                  "flavorTextTemplate": "Organizer folder {{ AgentName }} MTConnect agent device definitions.",
                   "paths": [
                     {
+											"name": "Agent device configuration",
                       "regex": "^.*+\\.xml$",
-                      "flavorTextTemplate": "MTConnect agent {{ AgentName }} device definition."
+                      "flavorTextTemplate": "{{ AgentName }} MTConnect agent device definition."
                     },
                     {
+											"name": "Backup Agent device configuration",
                       "regex": "^.*+\\.xml\\.(?<Timestamp>.*+Z)$",
-                      "flavorTextTemplate": "MTConnect agent {{ AgentName }} device definition backup."
+                      "flavorTextTemplate": "{{ AgentName }} MTConnect agent device definition backup."
                     }
                   ]
                 }

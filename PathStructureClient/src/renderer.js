@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const name = document.createElement('span');
     name.className = 'path-name';
-    name.textContent = child.literalPath || child.displayName;
+    name.textContent = child.displayName || child.literalPath;
 
     if (child.isRequired) {
       const badge = document.createElement('span');
@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (trackedPathElement) {
-      trackedPathElement.textContent = payload?.trackedPath || 'No path selected.';
+      trackedPathElement.textContent = payload?.trackedName || payload?.trackedPath || 'No path selected.';
     }
 
     if (trackedFlavorElement) {
