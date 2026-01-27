@@ -1,8 +1,9 @@
-const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, MenuItem, Tray, ipcMain, nativeImage } = require('electron');
 const { execFile, spawn } = require('child_process');
 const fs = require('fs');
-const net = require('net');
 const path = require('path');
+const { JsonRpcService } = require('./src/services/jsonRpcService');
+const { PathStructureService } = require('./src/services/pathStructureService');
 
 const watcherPort = Number.parseInt(process.env.PATHSTRUCTURE_WATCHER_PORT || '49321', 10);
 const watcherProcessName = 'PathStructure.WatcherHost.exe';
@@ -10,9 +11,10 @@ const watcherProcessName = 'PathStructure.WatcherHost.exe';
 let mainWindow;
 let tray;
 let watcherProcess;
-let watcherSocket;
-let watcherBuffer = '';
 let reconnectTimer;
+let rpcService;
+let pathStructureService;
+let scaffoldMenuItem;
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -20,6 +22,7 @@ const createWindow = () => {
     height: 650,
     alwaysOnTop: true,
     show: false,
+    autoHideMenuBar: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -92,6 +95,32 @@ const createTray = async () => {
   tray.setContextMenu(contextMenu);
 };
 
+const createAppMenu = () => {
+  scaffoldMenuItem = new MenuItem({
+    label: 'Scaffold Folders',
+    enabled: false,
+    click: async () => {
+      if (!pathStructureService) {
+        return;
+      }
+      const result = await pathStructureService.scaffoldRequiredFolders();
+      sendStatusUpdate({ connected: true, message: result.message });
+    }
+  });
+
+  const template = [
+    {
+      label: 'Edit',
+      submenu: [
+        scaffoldMenuItem
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+};
+
 const getWatcherExecutablePath = () => {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'watcher', watcherProcessName);
@@ -111,7 +140,7 @@ const stopExistingWatcherHost = () => {
 const startWatcherHost = () => {
   const executablePath = getWatcherExecutablePath();
   if (!fs.existsSync(executablePath)) {
-    sendWatcherStatus({
+    sendStatusUpdate({
       connected: false,
       message: `Watcher host executable not found at ${executablePath}.`
     });
@@ -125,7 +154,7 @@ const startWatcherHost = () => {
 
   watcherProcess.on('error', () => {
     watcherProcess = null;
-    sendWatcherStatus({
+    sendStatusUpdate({
       connected: false,
       message: 'Failed to start watcher host.'
     });
@@ -143,9 +172,8 @@ const stopWatcherHost = () => {
     watcherProcess.kill();
     watcherProcess = null;
   }
-  if (watcherSocket) {
-    watcherSocket.destroy();
-    watcherSocket = null;
+  if (rpcService) {
+    rpcService.disconnect();
   }
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
@@ -163,55 +191,58 @@ const scheduleWatcherReconnect = () => {
   }, 2000);
 };
 
-const sendWatcherStatus = (status) => {
+const sendStatusUpdate = (status) => {
   if (mainWindow && mainWindow.webContents) {
-    mainWindow.webContents.send('watcher-status', status);
+    mainWindow.webContents.send('pathstructure-status', status);
+  }
+};
+
+const sendPathUpdate = (payload) => {
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('pathstructure-update', payload);
+  }
+  if (scaffoldMenuItem) {
+    const children = payload?.children || [];
+    scaffoldMenuItem.enabled = children.some((child) => child.isRequired && !child.isFile);
   }
 };
 
 const connectToWatcherHost = () => {
-  if (watcherSocket) {
-    return;
+  if (!rpcService) {
+    rpcService = new JsonRpcService({ host: '127.0.0.1', port: watcherPort });
   }
-  watcherSocket = net.createConnection({ host: '127.0.0.1', port: watcherPort }, () => {
-    sendWatcherStatus({
+  if (!pathStructureService) {
+    pathStructureService = new PathStructureService({ rpcService });
+    pathStructureService.on('status', (status) => sendStatusUpdate(status));
+    pathStructureService.on('update', (payload) => sendPathUpdate(payload));
+  }
+
+  rpcService.removeAllListeners('notification');
+  rpcService.on('notification', (payload) => {
+    void pathStructureService.handleNotification(payload);
+  });
+
+  rpcService.removeAllListeners('connected');
+  rpcService.on('connected', () => {
+    sendStatusUpdate({
       connected: true,
       message: `Connected to watcher host on port ${watcherPort}.`
     });
   });
 
-  watcherSocket.on('data', (chunk) => {
-    watcherBuffer += chunk.toString();
-    const payloads = watcherBuffer.split('\n');
-    watcherBuffer = payloads.pop() || '';
-    payloads.filter(Boolean).forEach((payload) => {
-      try {
-        const parsed = JSON.parse(payload);
-        if (mainWindow && mainWindow.webContents) {
-          mainWindow.webContents.send('watcher-event', parsed);
-        }
-      } catch (error) {
-        sendWatcherStatus({
-          connected: true,
-          message: 'Received malformed watcher payload.'
-        });
-      }
-    });
-  });
-
-  watcherSocket.on('close', () => {
-    watcherSocket = null;
-    watcherBuffer = '';
-    sendWatcherStatus({ connected: false, message: 'Watcher host disconnected.' });
+  rpcService.removeAllListeners('disconnected');
+  rpcService.on('disconnected', () => {
+    sendStatusUpdate({ connected: false, message: 'Watcher host disconnected.' });
     scheduleWatcherReconnect();
   });
 
-  watcherSocket.on('error', () => {
-    watcherSocket = null;
-    watcherBuffer = '';
-    sendWatcherStatus({ connected: false, message: 'Unable to reach watcher host.' });
+  rpcService.removeAllListeners('error');
+  rpcService.on('error', () => {
+    sendStatusUpdate({ connected: false, message: 'Unable to reach watcher host.' });
     scheduleWatcherReconnect();
   });
+
+  rpcService.connect();
 };
 
 const bootWatcherHost = async () => {
@@ -222,6 +253,7 @@ const bootWatcherHost = async () => {
 
 app.whenReady().then(async () => {
   mainWindow = createWindow();
+  createAppMenu();
   await createTray();
   await bootWatcherHost();
 
@@ -234,6 +266,22 @@ app.whenReady().then(async () => {
 
 ipcMain.handle('show-window', () => {
   showFromTray();
+});
+
+ipcMain.handle('json-rpc-request', (_event, payload) => {
+  if (!rpcService) {
+    return Promise.reject(new Error('JSON-RPC service not available.'));
+  }
+  return rpcService.sendRequest(payload?.method, payload?.params);
+});
+
+ipcMain.handle('scaffold-required-folders', async () => {
+  if (!pathStructureService) {
+    return { created: [], skipped: [], message: 'Path structure service not available.' };
+  }
+  const result = await pathStructureService.scaffoldRequiredFolders();
+  sendStatusUpdate({ connected: true, message: result.message });
+  return result;
 });
 
 app.on('window-all-closed', () => {

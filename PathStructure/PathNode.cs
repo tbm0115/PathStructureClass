@@ -14,7 +14,7 @@ namespace PathStructure
         /// Initializes a new instance of the <see cref="PathNode"/> class.
         /// </summary>
         public PathNode(string name, string pattern)
-            : this(name, pattern, null, null, null, null)
+            : this(name, pattern, null, null, null, null, false)
         {
         }
 
@@ -27,7 +27,8 @@ namespace PathStructure
             string flavorTextTemplate,
             string backgroundColor,
             string foregroundColor,
-            string icon)
+            string icon,
+            bool isRequired)
         {
             Name = name ?? throw new ArgumentNullException(nameof(name));
             Pattern = pattern ?? throw new ArgumentNullException(nameof(pattern));
@@ -35,6 +36,7 @@ namespace PathStructure
             BackgroundColor = backgroundColor;
             ForegroundColor = foregroundColor;
             Icon = icon;
+            IsRequired = isRequired;
         }
 
         /// <inheritdoc />
@@ -62,6 +64,11 @@ namespace PathStructure
         /// Gets the icon path associated with this node.
         /// </summary>
         public string Icon { get; }
+
+        /// <summary>
+        /// Gets a value indicating whether this node is required.
+        /// </summary>
+        public bool IsRequired { get; }
 
         /// <summary>
         /// Gets the child nodes for this node.

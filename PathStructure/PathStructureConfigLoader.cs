@@ -91,7 +91,7 @@ namespace PathStructure
 
         private static IPathNode BuildRootNode(IEnumerable<PathStructurePath> paths)
         {
-            var root = new PathNode("Root", RootPattern);
+            var root = new PathNode("Root", RootPattern, null, null, null, null, false);
             if (paths == null)
             {
                 return root;
@@ -111,7 +111,8 @@ namespace PathStructure
                     path.FlavorTextTemplate,
                     path.BackgroundColor,
                     path.ForegroundColor,
-                    path.Icon);
+                    path.Icon,
+                    path.IsRequired);
                 root.Children.Add(child);
             }
 

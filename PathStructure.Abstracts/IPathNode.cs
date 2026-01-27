@@ -19,6 +19,11 @@ namespace PathStructure.Abstracts
         string Pattern { get; }
 
         /// <summary>
+        /// Gets a value indicating whether this node is required.
+        /// </summary>
+        bool IsRequired { get; }
+
+        /// <summary>
         /// Gets the child nodes for this node.
         /// </summary>
         IReadOnlyList<IPathNode> Children { get; }

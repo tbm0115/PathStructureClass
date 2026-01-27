@@ -8,31 +8,39 @@
   </head>
   <body>
     <main>
-      <header>
-        <h1>PathStructure Client</h1>
-        <p>Always-on-top workspace for validating file paths.</p>
+      <header class="app-header">
+        <div>
+          <h1>PathStructure Client</h1>
+          <p class="subtitle">Tracking the most recent Explorer selection for path validation.</p>
+        </div>
+        <div class="status-card">
+          <span id="connection-status" data-connected="false">Disconnected</span>
+          <p id="status-message">Waiting for watcher host...</p>
+        </div>
       </header>
 
-      <section class="panel">
-        <h2>Configuration sources</h2>
-        <ul>
-          <li>Local user configuration file</li>
-          <li>Shared UNC path configuration</li>
-          <li>Server-based REST configuration (future)</li>
-        </ul>
+      <section class="tracked-panel">
+        <div>
+          <h2>Tracked selection</h2>
+          <p class="label">Current path</p>
+          <p id="tracked-path" class="value">No path selected.</p>
+        </div>
+        <div>
+          <p class="label">Tracked folder</p>
+          <p id="tracked-folder" class="value">Awaiting Explorer selection.</p>
+        </div>
       </section>
 
-      <section class="panel">
-        <h2>Plugin pipeline</h2>
-        <p>Plugins are discovered from configured folders and executed alongside the watcher UI.</p>
-      </section>
-
-      <section class="panel watcher-panel">
-        <h2>Explorer watcher</h2>
-        <p id="watcher-status" data-connected="false">Waiting for watcher host...</p>
-        <ul id="watcher-events" class="event-list">
-          <li>Explorer events will appear here once connected.</li>
-        </ul>
+      <section class="child-panel">
+        <div class="child-panel-header">
+          <div>
+            <h2>Immediate child path structures</h2>
+            <p class="subtitle">Files and folders expected directly beneath the tracked folder.</p>
+          </div>
+          <span id="child-count" class="count-pill">0 items</span>
+        </div>
+        <ul id="path-structure-list" class="path-list"></ul>
+        <p id="empty-state" class="empty-state">Select a folder in Explorer to see child path structures.</p>
       </section>
     </main>
     <script src="renderer.js"></script>
