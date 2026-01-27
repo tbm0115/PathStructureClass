@@ -55,11 +55,14 @@ h2 {
   border-radius: 16px;
   padding: 20px 24px;
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .tracked-panel {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: start;
+  align-content: start;
+  min-height: 120px;
 }
 
 .tracked-panel h2 {
@@ -102,6 +105,7 @@ h2 {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  margin-top: 2px;
 }
 
 .child-panel-content {
@@ -266,13 +270,13 @@ h2 {
 }
 
 .modal {
-  width: min(420px, 90vw);
+  width: min(360px, 90vw);
   background: #0f1521;
   border: 1px solid #233149;
   border-radius: 16px;
-  padding: 20px;
+  padding: 16px;
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .modal-header {
@@ -283,7 +287,7 @@ h2 {
 
 .modal-body {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .field {
@@ -317,10 +321,22 @@ h2 {
 }
 
 .modal-window {
-  padding: 24px;
+  padding: 16px;
   min-height: 100vh;
   display: grid;
   place-items: center;
+}
+
+.add-path-body {
+  overflow: hidden;
+}
+
+.helper-text {
+  margin-top: 4px;
+  color: #8aa1c1;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  display: block;
 }
 
 .sr-only {

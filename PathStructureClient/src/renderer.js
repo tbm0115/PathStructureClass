@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const trackedPathElement = document.getElementById('tracked-path');
   const trackedFlavorElement = document.getElementById('tracked-flavor');
   const trackedFolderElement = document.getElementById('tracked-folder');
+  const trackedFolderGroup = document.getElementById('tracked-folder-group');
   const listElement = document.getElementById('path-structure-list');
   const emptyState = document.getElementById('empty-state');
   const countElement = document.getElementById('child-count');
@@ -159,6 +160,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (trackedFolderElement) {
       trackedFolderElement.textContent = payload?.trackedFolder || 'Awaiting Explorer selection.';
+    }
+
+    if (trackedFolderGroup) {
+      trackedFolderGroup.hidden =
+        !payload?.trackedFolder ||
+        (payload?.trackedPath && payload?.trackedFolder && payload.trackedPath === payload.trackedFolder);
     }
 
     renderList();
