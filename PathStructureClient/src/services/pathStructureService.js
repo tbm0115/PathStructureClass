@@ -51,6 +51,19 @@ const renderTemplate = (template, match) => {
   });
 };
 
+const renderTemplateWithVariables = (template, variables) => {
+  if (!template) {
+    return '';
+  }
+  if (!variables || typeof variables !== 'object') {
+    return template;
+  }
+  return template.replace(/\{\{\s*([^}\s]+)\s*\}\}/g, (_token, key) => {
+    const value = variables[key];
+    return value ?? '';
+  });
+};
+
 const extractGroupNames = (pattern) => {
   if (!pattern) {
     return [];
@@ -99,6 +112,8 @@ class PathStructureService extends EventEmitter {
     this.state = {
       trackedPath: null,
       trackedFolder: null,
+      currentMatch: null,
+      variables: {},
       rawChildren: [],
       children: []
     };
@@ -138,6 +153,8 @@ class PathStructureService extends EventEmitter {
 
   async handlePathChanged(params) {
     this.state.trackedPath = params?.path || null;
+    this.state.currentMatch = params?.currentMatch || null;
+    this.state.variables = params?.variables || {};
     const immediateChildren =
       params?.immediateChildMatches ||
       params?.ImmediateChildMatches ||
@@ -153,15 +170,24 @@ class PathStructureService extends EventEmitter {
 
     const entries = await this.readDirectoryEntries(trackedFolder);
     const children = this.state.rawChildren.map((child) =>
-      this.buildChildState(child, entries, trackedFolder, this.state.trackedPath)
+      this.buildChildState(child, entries, trackedFolder, this.state.trackedPath, this.state.variables)
     );
 
     this.state.children = children;
     this.emit('update', {
       trackedPath: this.state.trackedPath,
       trackedFolder: this.state.trackedFolder,
+      currentFlavorText: this.buildCurrentFlavorText(),
       children: this.state.children
     });
+  }
+
+  buildCurrentFlavorText() {
+    const template =
+      this.state.currentMatch?.FlavorTextTemplate ||
+      this.state.currentMatch?.flavorTextTemplate ||
+      '';
+    return renderTemplateWithVariables(template, this.state.variables);
   }
 
   async scaffoldRequiredFolders() {
@@ -240,7 +266,7 @@ class PathStructureService extends EventEmitter {
     }
   }
 
-  buildChildState(child, entryInfo, trackedFolder, trackedPath) {
+  buildChildState(child, entryInfo, trackedFolder, trackedPath, variables) {
     const nodeName = child?.NodeName || child?.nodeName || child?.name;
     const pattern = child?.Pattern || child?.pattern || '';
     const flavorTextTemplate = child?.FlavorTextTemplate || child?.flavorTextTemplate || '';
@@ -317,7 +343,10 @@ class PathStructureService extends EventEmitter {
     }
 
     const displayName = matchedEntry?.name || nodeName || sanitizeName(pattern);
-    const flavorText = renderTemplate(flavorTextTemplate, matchedEntryResult || fallbackMatch || lineageMatch);
+    const templateMatch = matchedEntryResult || fallbackMatch || lineageMatch;
+    const flavorText = templateMatch?.groups
+      ? renderTemplate(flavorTextTemplate, templateMatch)
+      : renderTemplateWithVariables(flavorTextTemplate, variables);
 
     return {
       displayName,

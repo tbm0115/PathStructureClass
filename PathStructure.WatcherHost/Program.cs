@@ -210,6 +210,11 @@ namespace PathStructure.WatcherHost
         {
             var matchSummary = FindClosestMatches(url);
             var childMatches = FindImmediateChildMatches(url, matchSummary);
+            var hasCurrentMatch = TryGetValidationContext(url, out var currentMatch, out var variables);
+            if (!hasCurrentMatch && IsFilePath(url))
+            {
+                hasCurrentMatch = TryGetValidationContext(Path.GetDirectoryName(url), out currentMatch, out variables);
+            }
 #if DEBUG
             LogMatches(url, matchSummary);
 #endif
@@ -221,6 +226,19 @@ namespace PathStructure.WatcherHost
                 {
                     message = "Explorer path changed.",
                     path = url,
+                    currentMatch = hasCurrentMatch ? new
+                    {
+                        currentMatch.NodeName,
+                        currentMatch.Pattern,
+                        currentMatch.MatchedValue,
+                        currentMatch.MatchLength,
+                        currentMatch.FlavorTextTemplate,
+                        currentMatch.BackgroundColor,
+                        currentMatch.ForegroundColor,
+                        currentMatch.Icon,
+                        isRequired = currentMatch.IsRequired
+                    } : null,
+                    variables = variables,
                     immediateChildMatches = childMatches.Select(match => new
                     {
                         match.NodeName,
@@ -670,6 +688,30 @@ namespace PathStructure.WatcherHost
 
             var lastMatch = result.MatchTrail[result.MatchTrail.Count - 1];
             match = BuildPatternMatch(lastMatch);
+            return true;
+        }
+
+        private static bool TryGetValidationContext(
+            string path,
+            out PathPatternMatch match,
+            out IReadOnlyDictionary<string, string> variables)
+        {
+            match = default;
+            variables = null;
+            if (_pathStructure == null || string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            var result = _pathStructure.ValidatePath(path);
+            if (!result.IsValid || result.MatchTrail.Count == 0)
+            {
+                return false;
+            }
+
+            var lastMatch = result.MatchTrail[result.MatchTrail.Count - 1];
+            match = BuildPatternMatch(lastMatch);
+            variables = result.Variables;
             return true;
         }
 
