@@ -16,6 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('child-search');
   const addPathButton = document.getElementById('add-path');
   const toggleServiceButton = document.getElementById('toggle-service');
+  const importFileInput = document.getElementById('import-file');
+  const importFileButton = document.getElementById('import-file-button');
+  const importUrlInput = document.getElementById('import-url');
+  const importUrlButton = document.getElementById('import-url-button');
 
   let allChildren = [];
   let currentSearch = '';
@@ -199,6 +203,50 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         await window.pathStructure?.startService();
       }
+    });
+  }
+
+  const submitImport = async (params) => {
+    try {
+      await window.pathStructure?.sendJsonRpcRequest('importPathStructure', params);
+      await window.pathStructure?.softReset();
+      await window.pathStructure?.notifyStatus({
+        connected: true,
+        message: 'Import added. Reloading configuration...'
+      });
+    } catch (error) {
+      await window.pathStructure?.notifyStatus({
+        connected: true,
+        message: 'Unable to import configuration.',
+        errorDetails: error?.message || error
+      });
+      console.error('Import failed:', error);
+    }
+  };
+
+  if (importFileButton && importFileInput) {
+    importFileButton.addEventListener('click', () => {
+      importFileInput.click();
+    });
+
+    importFileInput.addEventListener('change', async () => {
+      const file = importFileInput.files?.[0];
+      if (!file?.path) {
+        return;
+      }
+      await submitImport({ filePath: file.path });
+      importFileInput.value = '';
+    });
+  }
+
+  if (importUrlButton && importUrlInput) {
+    importUrlButton.addEventListener('click', async () => {
+      const url = importUrlInput.value.trim();
+      if (!url) {
+        return;
+      }
+      await submitImport({ url });
+      importUrlInput.value = '';
     });
   }
 });

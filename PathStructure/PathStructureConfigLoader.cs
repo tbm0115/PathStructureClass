@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using PathStructure.Abstracts;
@@ -15,6 +16,7 @@ namespace PathStructure
         private const string RootPattern = ".*";
         private static readonly Regex NamedGroupRegex = new Regex(@"\(\?<(?<name>[A-Za-z][A-Za-z0-9_]*)>", RegexOptions.Compiled);
         private static readonly Regex TemplateTokenRegex = new Regex(@"\{\{\s*(?<name>[^}]+)\s*\}\}", RegexOptions.Compiled);
+        private static readonly HttpClient HttpClient = new HttpClient();
 
         /// <summary>
         /// Loads a configuration file, resolving any imports and producing a root node.
@@ -68,12 +70,20 @@ namespace PathStructure
                 }
 
                 var importPath = import.Path;
-                if (!Path.IsPathRooted(importPath))
+                PathStructureConfig importedConfig;
+                if (TryGetUri(importPath, out var importUri))
                 {
-                    importPath = Path.GetFullPath(Path.Combine(baseDirectory, importPath));
+                    importedConfig = LoadFromUrlInternal(importUri, activeImports);
                 }
+                else
+                {
+                    if (!Path.IsPathRooted(importPath))
+                    {
+                        importPath = Path.GetFullPath(Path.Combine(baseDirectory, importPath));
+                    }
 
-                var importedConfig = LoadFromFileInternal(importPath, activeImports);
+                    importedConfig = LoadFromFileInternal(importPath, activeImports);
+                }
                 mergedPaths.AddRange(ApplyNamespace(importedConfig.Paths, import.Namespace));
                 mergedPlugins.AddRange(importedConfig.Plugins);
             }
@@ -87,6 +97,85 @@ namespace PathStructure
 
             activeImports.Remove(filePath);
             return config;
+        }
+
+        private static PathStructureConfig LoadFromUrlInternal(Uri uri, HashSet<string> activeImports)
+        {
+            var normalized = uri.AbsoluteUri;
+            if (!activeImports.Add(normalized))
+            {
+                throw new InvalidOperationException($"Circular configuration import detected at '{normalized}'.");
+            }
+
+            var rawJson = HttpClient.GetStringAsync(uri).GetAwaiter().GetResult();
+            var serializerOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                AllowTrailingCommas = true,
+                ReadCommentHandling = JsonCommentHandling.Skip
+            };
+            var config = JsonSerializer.Deserialize<PathStructureConfig>(rawJson, serializerOptions) ?? new PathStructureConfig();
+
+            config.Imports = config.Imports ?? new List<PathStructureImport>();
+            config.Paths = config.Paths ?? new List<PathStructurePath>();
+            config.Plugins = config.Plugins ?? new List<PathStructurePlugin>();
+
+            var mergedPaths = new List<PathStructurePath>();
+            var mergedPlugins = new List<PathStructurePlugin>();
+
+            foreach (var import in config.Imports)
+            {
+                if (string.IsNullOrWhiteSpace(import?.Path))
+                {
+                    continue;
+                }
+
+                var importPath = import.Path;
+                PathStructureConfig importedConfig;
+                if (TryGetUri(importPath, out var importUri))
+                {
+                    importedConfig = LoadFromUrlInternal(importUri, activeImports);
+                }
+                else if (Path.IsPathRooted(importPath))
+                {
+                    importedConfig = LoadFromFileInternal(importPath, activeImports);
+                }
+                else
+                {
+                    var resolvedUri = new Uri(uri, importPath);
+                    importedConfig = LoadFromUrlInternal(resolvedUri, activeImports);
+                }
+
+                mergedPaths.AddRange(ApplyNamespace(importedConfig.Paths, import.Namespace));
+                mergedPlugins.AddRange(importedConfig.Plugins);
+            }
+
+            mergedPaths.AddRange(config.Paths);
+            mergedPlugins.AddRange(config.Plugins);
+
+            config.Paths = mergedPaths;
+            config.Plugins = mergedPlugins;
+            config.SetRoot(BuildRootNode(config.Paths));
+
+            activeImports.Remove(normalized);
+            return config;
+        }
+
+        private static bool TryGetUri(string value, out Uri uri)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                uri = null;
+                return false;
+            }
+
+            if (Uri.TryCreate(value, UriKind.Absolute, out uri))
+            {
+                return uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
+            }
+
+            uri = null;
+            return false;
         }
 
         private static IPathNode BuildRootNode(IEnumerable<PathStructurePath> paths)

@@ -21,15 +21,31 @@ namespace PathStructure.WatcherHost
     internal class Program
     {
         private const int DefaultPort = 49321;
+        private const string DefaultConfigFileName = "pathstructure-default.json";
         private static readonly ConcurrentDictionary<TcpClient, NetworkStream> Clients = new ConcurrentDictionary<TcpClient, NetworkStream>();
         private static CancellationTokenSource _cts = new CancellationTokenSource();
         private static ExplorerWatcher _watcher;
         private static TcpListener _listener;
         private static PathStructure _pathStructure;
         private static PathStructureConfig _pathConfig;
+        private static string _configFilePath;
+        private static string _defaultConfigFilePath;
+        private static string _lastSelectionPath;
+        private static readonly object ConfigSync = new object();
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        private static readonly JsonSerializerOptions ConfigReadOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            AllowTrailingCommas = true,
+            ReadCommentHandling = JsonCommentHandling.Skip
+        };
+        private static readonly JsonSerializerOptions ConfigWriteOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true
         };
 
         /// <summary>
@@ -77,11 +93,14 @@ namespace PathStructure.WatcherHost
                 var resolvedPath = Path.GetFullPath(configPath);
                 Console.WriteLine($"Loading configuration from {resolvedPath}.");
                 config = PathStructureConfigLoader.LoadFromFile(resolvedPath);
+                _configFilePath = resolvedPath;
             }
             else
             {
-                var rootNode = new PathNode("Root", @"^.*$", null, null, null, null, false);
-                config = new PathStructureConfig(rootNode);
+                var resolvedPath = EnsureDefaultConfigFile();
+                Console.WriteLine($"Loading configuration from {resolvedPath}.");
+                config = PathStructureConfigLoader.LoadFromFile(resolvedPath);
+                _configFilePath = resolvedPath;
             }
             _pathConfig = config;
             _pathStructure = new PathStructure(config);
@@ -208,6 +227,7 @@ namespace PathStructure.WatcherHost
         /// </summary>
         private static void OnExplorerFound(string url)
         {
+            _lastSelectionPath = url;
             var matchSummary = FindClosestMatches(url);
             var childMatches = FindImmediateChildMatches(url, matchSummary);
             var hasCurrentMatch = TryGetValidationContext(url, out var currentMatch, out var variables);
@@ -362,6 +382,9 @@ namespace PathStructure.WatcherHost
                     case "addPath":
                         await HandleAddPathCommandAsync(request, stream).ConfigureAwait(false);
                         break;
+                    case "importPathStructure":
+                        await HandleImportPathCommandAsync(request, stream).ConfigureAwait(false);
+                        break;
                     default:
                         await SendJsonRpcErrorAsync(stream, request.Id, -32601, $"Unknown method '{request.Method}'.", null).ConfigureAwait(false);
                         break;
@@ -397,7 +420,7 @@ namespace PathStructure.WatcherHost
                 return;
             }
 
-            if (_pathConfig.Paths.Any(path => string.Equals(path.Regex, regex, StringComparison.OrdinalIgnoreCase)))
+            if (ContainsRegex(_pathConfig.Paths, regex))
             {
                 await SendJsonRpcErrorAsync(stream, request.Id, -32002, "Path regex already exists.", regex).ConfigureAwait(false);
                 return;
@@ -414,16 +437,149 @@ namespace PathStructure.WatcherHost
                 IsRequired = GetOptionalBool(request.Params, "isRequired")
             };
 
-            _pathConfig.Paths.Add(newPath);
-            if (_pathConfig.Root is PathNode rootNode)
+            var configPath = GetActiveConfigPath();
+            if (string.IsNullOrWhiteSpace(configPath))
             {
-                rootNode.Children.Add(BuildPathNode(newPath));
+                await SendJsonRpcErrorAsync(stream, request.Id, -32003, "Unable to determine config file path.", null).ConfigureAwait(false);
+                return;
+            }
+
+            PathStructureConfig rawConfig;
+            try
+            {
+                rawConfig = LoadRawConfig(configPath);
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32004, "Unable to load config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            var addedToRoot = true;
+            var parentPath = ResolveTargetPathForSelection(rawConfig, out var targetMatchDescription, out var targetName);
+            if (parentPath != null)
+            {
+                parentPath.Paths = parentPath.Paths ?? new List<PathStructurePath>();
+                parentPath.Paths.Add(newPath);
+                addedToRoot = false;
+            }
+            else
+            {
+                rawConfig.Paths.Add(newPath);
+            }
+
+            try
+            {
+                SaveConfig(configPath, rawConfig);
+                ReloadConfiguration(configPath);
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32005, "Unable to save config file.", ex.Message).ConfigureAwait(false);
+                return;
             }
 
             await SendJsonRpcResultAsync(stream, request.Id, new
             {
-                message = "Path regex added.",
-                path = regex
+                message = addedToRoot
+                    ? "Path regex added at the root level."
+                    : $"Path regex added under {targetName ?? targetMatchDescription ?? "matched path"}.",
+                path = regex,
+                parentMatch = addedToRoot ? null : targetMatchDescription
+            }).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Handles the JSON-RPC importPathStructure request.
+        /// </summary>
+        private static async Task HandleImportPathCommandAsync(JsonRpcRequest request, NetworkStream stream)
+        {
+            if (request.Params.ValueKind != JsonValueKind.Object)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Missing request parameters.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var filePath = GetOptionalString(request.Params, "filePath");
+            var url = GetOptionalString(request.Params, "url");
+            if (string.IsNullOrWhiteSpace(filePath) && string.IsNullOrWhiteSpace(url))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Provide a filePath or url.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var defaultConfigPath = EnsureDefaultConfigFile();
+            PathStructureConfig rawConfig;
+            try
+            {
+                rawConfig = LoadRawConfig(defaultConfigPath);
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32004, "Unable to load config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            string importedLocation;
+            if (!string.IsNullOrWhiteSpace(filePath))
+            {
+                if (!File.Exists(filePath))
+                {
+                    await SendJsonRpcErrorAsync(stream, request.Id, -32006, "Import file not found.", filePath).ConfigureAwait(false);
+                    return;
+                }
+
+                try
+                {
+                    importedLocation = CopyImportFile(filePath, defaultConfigPath);
+                }
+                catch (Exception ex)
+                {
+                    await SendJsonRpcErrorAsync(stream, request.Id, -32007, "Unable to copy import file.", ex.Message).ConfigureAwait(false);
+                    return;
+                }
+            }
+            else
+            {
+                if (!TryGetHttpUrl(url, out var normalizedUrl))
+                {
+                    await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Provided url was invalid.", url).ConfigureAwait(false);
+                    return;
+                }
+
+                importedLocation = normalizedUrl;
+            }
+
+            if (rawConfig.Imports.Any(import => string.Equals(import.Path, importedLocation, StringComparison.OrdinalIgnoreCase)))
+            {
+                await SendJsonRpcResultAsync(stream, request.Id, new
+                {
+                    message = "Import already registered.",
+                    importPath = importedLocation
+                }).ConfigureAwait(false);
+                return;
+            }
+
+            rawConfig.Imports.Add(new PathStructureImport { Path = importedLocation });
+
+            try
+            {
+                SaveConfig(defaultConfigPath, rawConfig);
+                if (string.Equals(defaultConfigPath, _configFilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    ReloadConfiguration(defaultConfigPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32005, "Unable to save config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            await SendJsonRpcResultAsync(stream, request.Id, new
+            {
+                message = "Import added.",
+                importPath = importedLocation
             }).ConfigureAwait(false);
         }
 
@@ -441,6 +597,341 @@ namespace PathStructure.WatcherHost
         private static bool GetOptionalBool(JsonElement root, string propertyName)
         {
             return root.TryGetProperty(propertyName, out var element) && element.ValueKind == JsonValueKind.True;
+        }
+
+        private static string GetActiveConfigPath()
+        {
+            return !string.IsNullOrWhiteSpace(_configFilePath) ? _configFilePath : EnsureDefaultConfigFile();
+        }
+
+        private static void ReloadConfiguration(string configPath)
+        {
+            if (string.IsNullOrWhiteSpace(configPath))
+            {
+                return;
+            }
+
+            lock (ConfigSync)
+            {
+                var refreshed = PathStructureConfigLoader.LoadFromFile(configPath);
+                _pathConfig = refreshed;
+                _pathStructure = new PathStructure(refreshed);
+            }
+        }
+
+        private static PathStructureConfig LoadRawConfig(string configPath)
+        {
+            var rawJson = File.ReadAllText(configPath);
+            var config = JsonSerializer.Deserialize<PathStructureConfig>(rawJson, ConfigReadOptions) ?? new PathStructureConfig();
+            config.Imports = config.Imports ?? new List<PathStructureImport>();
+            config.Paths = config.Paths ?? new List<PathStructurePath>();
+            config.Plugins = config.Plugins ?? new List<PathStructurePlugin>();
+            return config;
+        }
+
+        private static void SaveConfig(string configPath, PathStructureConfig config)
+        {
+            if (string.IsNullOrWhiteSpace(configPath) || config == null)
+            {
+                return;
+            }
+
+            var payload = new
+            {
+                imports = config.Imports ?? new List<PathStructureImport>(),
+                paths = config.Paths ?? new List<PathStructurePath>(),
+                plugins = config.Plugins ?? new List<PathStructurePlugin>()
+            };
+
+            lock (ConfigSync)
+            {
+                var json = JsonSerializer.Serialize(payload, ConfigWriteOptions);
+                File.WriteAllText(configPath, json);
+            }
+        }
+
+        private static bool ContainsRegex(IEnumerable<PathStructurePath> paths, string regex)
+        {
+            if (paths == null || string.IsNullOrWhiteSpace(regex))
+            {
+                return false;
+            }
+
+            foreach (var path in paths)
+            {
+                if (path == null)
+                {
+                    continue;
+                }
+
+                if (string.Equals(path.Regex, regex, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                if (ContainsRegex(path.Paths, regex))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static PathStructurePath ResolveTargetPathForSelection(
+            PathStructureConfig rawConfig,
+            out string targetPattern,
+            out string targetName)
+        {
+            targetPattern = null;
+            targetName = null;
+            if (rawConfig == null)
+            {
+                return null;
+            }
+
+            if (!TryGetSelectionMatchTrail(out var matchTrail, out var isFileSelection))
+            {
+                return null;
+            }
+
+            var targetIndex = matchTrail.Count - 1;
+            if (isFileSelection)
+            {
+                if (matchTrail.Count < 2)
+                {
+                    return null;
+                }
+
+                targetIndex = matchTrail.Count - 2;
+            }
+
+            var targetNode = matchTrail[targetIndex]?.Node;
+            targetPattern = targetNode?.Pattern;
+            targetName = targetNode?.Name;
+
+            return FindOrCreateConfigPath(rawConfig, matchTrail, targetIndex);
+        }
+
+        private static bool TryGetSelectionMatchTrail(out IReadOnlyList<IPathMatchNode> matchTrail, out bool isFileSelection)
+        {
+            matchTrail = null;
+            isFileSelection = false;
+
+            if (_pathStructure == null || string.IsNullOrWhiteSpace(_lastSelectionPath))
+            {
+                return false;
+            }
+
+            var result = _pathStructure.ValidatePath(_lastSelectionPath);
+            if (!result.IsValid || result.MatchTrail.Count == 0)
+            {
+                return false;
+            }
+
+            matchTrail = result.MatchTrail;
+            isFileSelection = IsFilePath(_lastSelectionPath);
+            return true;
+        }
+
+        private static PathStructurePath FindOrCreateConfigPath(
+            PathStructureConfig rawConfig,
+            IReadOnlyList<IPathMatchNode> matchTrail,
+            int targetIndex)
+        {
+            if (rawConfig == null || matchTrail == null || targetIndex < 0 || targetIndex >= matchTrail.Count)
+            {
+                return null;
+            }
+
+            rawConfig.Paths = rawConfig.Paths ?? new List<PathStructurePath>();
+            var currentPaths = rawConfig.Paths;
+            PathStructurePath current = null;
+
+            for (var index = 0; index <= targetIndex; index++)
+            {
+                var node = matchTrail[index]?.Node;
+                var pattern = node?.Pattern;
+                if (string.IsNullOrWhiteSpace(pattern))
+                {
+                    return null;
+                }
+
+                current = currentPaths.FirstOrDefault(path =>
+                    string.Equals(path.Regex, pattern, StringComparison.Ordinal));
+                if (current == null)
+                {
+                    current = new PathStructurePath
+                    {
+                        Regex = pattern,
+                        Name = node?.Name ?? pattern.Trim()
+                    };
+                    currentPaths.Add(current);
+                }
+
+                current.Paths = current.Paths ?? new List<PathStructurePath>();
+                currentPaths = current.Paths;
+            }
+
+            return current;
+        }
+
+        private static string EnsureDefaultConfigFile()
+        {
+            if (!string.IsNullOrWhiteSpace(_defaultConfigFilePath) && File.Exists(_defaultConfigFilePath))
+            {
+                return _defaultConfigFilePath;
+            }
+
+            var baseDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PathStructure");
+            Directory.CreateDirectory(baseDirectory);
+            var configPath = Path.Combine(baseDirectory, DefaultConfigFileName);
+            _defaultConfigFilePath = configPath;
+
+            if (!File.Exists(configPath))
+            {
+                var defaultConfig = BuildDefaultConfig();
+                SaveConfig(configPath, defaultConfig);
+            }
+
+            return configPath;
+        }
+
+        private static PathStructureConfig BuildDefaultConfig()
+        {
+            var documents = new PathStructurePath
+            {
+                Regex = @"^Documents$",
+                Name = "Documents",
+                Paths = new List<PathStructurePath>
+                {
+                    new PathStructurePath { Regex = @"^.+\.txt$", Name = "Text file" },
+                    new PathStructurePath { Regex = @"^.+\.docx$", Name = "Word document" },
+                    new PathStructurePath { Regex = @"^.+\.xlsx$", Name = "Excel workbook" },
+                    new PathStructurePath { Regex = @"^.+\.pdf$", Name = "PDF document" }
+                }
+            };
+
+            var pictures = new PathStructurePath
+            {
+                Regex = @"^Pictures$",
+                Name = "Pictures",
+                Paths = new List<PathStructurePath>
+                {
+                    new PathStructurePath { Regex = @"^.+\.png$", Name = "PNG image" },
+                    new PathStructurePath { Regex = @"^.+\.jpe?g$", Name = "JPEG image" }
+                }
+            };
+
+            var videos = new PathStructurePath
+            {
+                Regex = @"^Videos$",
+                Name = "Videos",
+                Paths = new List<PathStructurePath>
+                {
+                    new PathStructurePath { Regex = @"^.+\.mp4$", Name = "MP4 video" }
+                }
+            };
+
+            var music = new PathStructurePath
+            {
+                Regex = @"^Music$",
+                Name = "Music",
+                Paths = new List<PathStructurePath>
+                {
+                    new PathStructurePath { Regex = @"^.+\.mp3$", Name = "MP3 audio" }
+                }
+            };
+
+            var userProfile = new PathStructurePath
+            {
+                Regex = @"^(?<UserName>[^\\]+)$",
+                Name = "User Profile",
+                Paths = new List<PathStructurePath> { documents, pictures, videos, music }
+            };
+
+            var users = new PathStructurePath
+            {
+                Regex = @"^Users$",
+                Name = "Users",
+                Paths = new List<PathStructurePath> { userProfile }
+            };
+
+            var programFiles = new PathStructurePath
+            {
+                Regex = @"^Program Files$",
+                Name = "Program Files"
+            };
+
+            var programFilesX86 = new PathStructurePath
+            {
+                Regex = @"^Program Files \(x86\)$",
+                Name = "Program Files (x86)"
+            };
+
+            var drive = new PathStructurePath
+            {
+                Regex = @"^[A-Z]:$",
+                Name = "Drive",
+                Paths = new List<PathStructurePath> { users, programFiles, programFilesX86 }
+            };
+
+            return new PathStructureConfig
+            {
+                Imports = new List<PathStructureImport>(),
+                Paths = new List<PathStructurePath> { drive },
+                Plugins = new List<PathStructurePlugin>()
+            };
+        }
+
+        private static string CopyImportFile(string sourcePath, string defaultConfigPath)
+        {
+            var baseDirectory = Path.GetDirectoryName(defaultConfigPath);
+            if (string.IsNullOrWhiteSpace(baseDirectory))
+            {
+                throw new InvalidOperationException("Default config directory could not be resolved.");
+            }
+
+            var fileName = Path.GetFileName(sourcePath);
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                fileName = "pathstructure-import.json";
+            }
+
+            var destinationPath = Path.Combine(baseDirectory, fileName);
+            var extension = Path.GetExtension(destinationPath);
+            var baseName = Path.GetFileNameWithoutExtension(destinationPath);
+            var counter = 1;
+            while (File.Exists(destinationPath))
+            {
+                destinationPath = Path.Combine(baseDirectory, $"{baseName}-{counter}{extension}");
+                counter++;
+            }
+
+            File.Copy(sourcePath, destinationPath, false);
+            return destinationPath;
+        }
+
+        private static bool TryGetHttpUrl(string value, out string normalized)
+        {
+            normalized = null;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            if (!Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri))
+            {
+                return false;
+            }
+
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            {
+                return false;
+            }
+
+            normalized = uri.AbsoluteUri;
+            return true;
         }
 
         /// <summary>
