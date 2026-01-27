@@ -278,6 +278,10 @@ class PathStructureService extends EventEmitter {
           return true;
         }
         matchedEntryResult = regex.exec(normalizePath(entry.fullPath));
+        if (matchedEntryResult?.length) {
+          return true;
+        }
+        matchedEntryResult = regex.exec(entry.name);
         return Boolean(matchedEntryResult?.length);
       });
     }

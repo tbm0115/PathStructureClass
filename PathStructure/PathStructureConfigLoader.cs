@@ -99,24 +99,48 @@ namespace PathStructure
 
             foreach (var path in paths)
             {
-                if (string.IsNullOrWhiteSpace(path?.Regex))
+                var child = BuildPathNode(path);
+                if (child != null)
                 {
-                    continue;
+                    root.Children.Add(child);
                 }
-
-                var name = string.IsNullOrWhiteSpace(path.Name) ? path.Regex.Trim() : path.Name.Trim();
-                var child = new PathNode(
-                    name,
-                    path.Regex,
-                    path.FlavorTextTemplate,
-                    path.BackgroundColor,
-                    path.ForegroundColor,
-                    path.Icon,
-                    path.IsRequired);
-                root.Children.Add(child);
             }
 
             return root;
+        }
+
+        private static PathNode BuildPathNode(PathStructurePath path)
+        {
+            if (string.IsNullOrWhiteSpace(path?.Regex))
+            {
+                return null;
+            }
+
+            var name = string.IsNullOrWhiteSpace(path.Name) ? path.Regex.Trim() : path.Name.Trim();
+            var node = new PathNode(
+                name,
+                path.Regex,
+                path.FlavorTextTemplate,
+                path.BackgroundColor,
+                path.ForegroundColor,
+                path.Icon,
+                path.IsRequired);
+
+            if (path.Paths == null)
+            {
+                return node;
+            }
+
+            foreach (var childPath in path.Paths)
+            {
+                var child = BuildPathNode(childPath);
+                if (child != null)
+                {
+                    node.Children.Add(child);
+                }
+            }
+
+            return node;
         }
 
         private static IEnumerable<PathStructurePath> ApplyNamespace(IEnumerable<PathStructurePath> paths, string importNamespace)
@@ -140,17 +164,43 @@ namespace PathStructure
                     continue;
                 }
 
-                yield return new PathStructurePath
-                {
-                    Regex = ApplyNamespaceToRegex(path.Regex, prefix),
-                    Name = path.Name,
-                    FlavorTextTemplate = ApplyNamespaceToTemplate(path.FlavorTextTemplate, prefix),
-                    BackgroundColor = path.BackgroundColor,
-                    ForegroundColor = path.ForegroundColor,
-                    Icon = path.Icon,
-                    IsRequired = path.IsRequired
-                };
+                yield return ApplyNamespaceToPath(path, prefix);
             }
+        }
+
+        private static PathStructurePath ApplyNamespaceToPath(PathStructurePath path, string prefix)
+        {
+            if (path == null)
+            {
+                return null;
+            }
+
+            var namespaced = new PathStructurePath
+            {
+                Regex = ApplyNamespaceToRegex(path.Regex, prefix),
+                Name = path.Name,
+                FlavorTextTemplate = ApplyNamespaceToTemplate(path.FlavorTextTemplate, prefix),
+                BackgroundColor = path.BackgroundColor,
+                ForegroundColor = path.ForegroundColor,
+                Icon = path.Icon,
+                IsRequired = path.IsRequired
+            };
+
+            if (path.Paths == null)
+            {
+                return namespaced;
+            }
+
+            foreach (var child in path.Paths)
+            {
+                var namespacedChild = ApplyNamespaceToPath(child, prefix);
+                if (namespacedChild != null)
+                {
+                    namespaced.Paths.Add(namespacedChild);
+                }
+            }
+
+            return namespaced;
         }
 
         private static string ApplyNamespaceToRegex(string regex, string prefix)

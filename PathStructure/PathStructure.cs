@@ -10,6 +10,7 @@ namespace PathStructure
     {
         private readonly IPathStructureConfig _config;
         private readonly IReadOnlyList<IPathValidationRule> _validationRules;
+        private static readonly char[] PathSeparators = new[] { '\\', '/' };
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PathStructure"/> class.
@@ -63,58 +64,131 @@ namespace PathStructure
             List<IPathMatchNode> matchTrail,
             out string failure)
         {
-            failure = null;
             if (node == null)
             {
                 failure = "Root node was not configured.";
                 return false;
             }
 
+            failure = null;
             var regex = node.GetRegex(_config.RegexOptions);
-            var match = regex.Match(remainingPath);
-            if (!match.Success)
-            {
-                failure = $"Pattern '{node.Pattern}' did not match '{remainingPath}'.";
-                return false;
-            }
+            var allowPartial = node.Children.Count > 0;
+            var lastFailure = $"Pattern '{node.Pattern}' did not match '{remainingPath}'.";
 
-            if (!CaptureVariables(match, regex.GetGroupNames(), variables, out failure))
+            foreach (var candidateLength in GetCandidateMatchLengths(remainingPath, allowPartial))
             {
-                return false;
-            }
-
-            matchTrail.Add(new PathMatchNode(node, match.Value));
-
-            if (node.Children.Count == 0)
-            {
-                return match.Value.Length == remainingPath.Length;
-            }
-
-            var unmatched = remainingPath.Substring(match.Value.Length).TrimStart('\\');
-            if (string.IsNullOrEmpty(unmatched))
-            {
-                return true;
-            }
-
-            foreach (var child in node.Children)
-            {
-                var childVariables = new Dictionary<string, string>(variables, StringComparer.OrdinalIgnoreCase);
-                var childTrail = new List<IPathMatchNode>(matchTrail);
-                if (TryMatchNode(child, unmatched, childVariables, childTrail, out failure))
+                var candidate = remainingPath.Substring(0, candidateLength);
+                var match = regex.Match(candidate);
+                if (!match.Success || match.Index != 0 || match.Length != candidate.Length)
                 {
-                    variables.Clear();
-                    foreach (var kvp in childVariables)
+                    continue;
+                }
+
+                var candidateVariables = new Dictionary<string, string>(variables, StringComparer.OrdinalIgnoreCase);
+                if (!CaptureVariables(match, regex.GetGroupNames(), candidateVariables, out var candidateFailure))
+                {
+                    lastFailure = candidateFailure;
+                    continue;
+                }
+
+                var candidateTrail = new List<IPathMatchNode>(matchTrail)
+                {
+                    new PathMatchNode(node, match.Value)
+                };
+
+                if (node.Children.Count == 0)
+                {
+                    if (candidateLength == remainingPath.Length)
                     {
-                        variables[kvp.Key] = kvp.Value;
+                        ApplyMatchOutcome(variables, matchTrail, candidateVariables, candidateTrail);
+                        return true;
                     }
 
-                    matchTrail.Clear();
-                    matchTrail.AddRange(childTrail);
+                    continue;
+                }
+
+                var unmatched = TrimSeparators(remainingPath.Substring(candidateLength));
+                if (string.IsNullOrEmpty(unmatched))
+                {
+                    ApplyMatchOutcome(variables, matchTrail, candidateVariables, candidateTrail);
                     return true;
+                }
+
+                foreach (var child in node.Children)
+                {
+                    var childVariables = new Dictionary<string, string>(candidateVariables, StringComparer.OrdinalIgnoreCase);
+                    var childTrail = new List<IPathMatchNode>(candidateTrail);
+                    if (TryMatchNode(child, unmatched, childVariables, childTrail, out var childFailure))
+                    {
+                        ApplyMatchOutcome(variables, matchTrail, childVariables, childTrail);
+                        return true;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(childFailure))
+                    {
+                        lastFailure = childFailure;
+                    }
                 }
             }
 
+            failure = lastFailure;
             return false;
+        }
+
+        private static IEnumerable<int> GetCandidateMatchLengths(string remainingPath, bool allowPartial)
+        {
+            if (string.IsNullOrEmpty(remainingPath))
+            {
+                yield break;
+            }
+
+            if (!allowPartial)
+            {
+                yield return remainingPath.Length;
+                yield break;
+            }
+
+            var boundaries = new List<int>();
+            for (var index = 1; index < remainingPath.Length; index++)
+            {
+                if (IsSeparator(remainingPath[index]) && !IsSeparator(remainingPath[index - 1]))
+                {
+                    boundaries.Add(index);
+                }
+            }
+
+            boundaries.Add(remainingPath.Length);
+
+            for (var index = boundaries.Count - 1; index >= 0; index--)
+            {
+                yield return boundaries[index];
+            }
+        }
+
+        private static bool IsSeparator(char value)
+        {
+            return value == PathSeparators[0] || value == PathSeparators[1];
+        }
+
+        private static string TrimSeparators(string path)
+        {
+            return string.IsNullOrEmpty(path) ? path : path.TrimStart(PathSeparators);
+        }
+
+        private static void ApplyMatchOutcome(
+            Dictionary<string, string> targetVariables,
+            List<IPathMatchNode> targetTrail,
+            Dictionary<string, string> sourceVariables,
+            List<IPathMatchNode> sourceTrail)
+        {
+            targetVariables.Clear();
+            foreach (var kvp in sourceVariables)
+            {
+                targetVariables[kvp.Key] = kvp.Value;
+            }
+
+            targetTrail.Clear();
+            targetTrail.AddRange(sourceTrail);
         }
 
         /// <summary>

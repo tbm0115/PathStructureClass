@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using PathStructure.Abstracts;
 
 namespace PathStructure
@@ -41,5 +43,13 @@ namespace PathStructure
         /// Gets or sets whether the path is required when variables resolve to a valid UNC path.
         /// </summary>
         public bool IsRequired { get; set; }
+
+        /// <summary>
+        /// Gets or sets nested path entries that are evaluated beneath this path.
+        /// </summary>
+        public IList<PathStructurePath> Paths { get; set; } = new List<PathStructurePath>();
+
+        /// <inheritdoc />
+        IReadOnlyList<IPathStructurePath> IPathStructurePath.Paths => Paths?.Cast<IPathStructurePath>().ToList() ?? new List<IPathStructurePath>();
     }
 }
