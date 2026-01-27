@@ -34,5 +34,10 @@ namespace PathStructure.Abstracts
         /// Gets the icon for the path.
         /// </summary>
         string Icon { get; }
+
+        /// <summary>
+        /// Gets whether the path is required when variables resolve to a valid UNC path.
+        /// </summary>
+        bool IsRequired { get; }
     }
 }

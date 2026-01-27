@@ -379,7 +379,8 @@ namespace PathStructure.WatcherHost
                 FlavorTextTemplate = GetOptionalString(request.Params, "flavorTextTemplate"),
                 BackgroundColor = GetOptionalString(request.Params, "backgroundColor"),
                 ForegroundColor = GetOptionalString(request.Params, "foregroundColor"),
-                Icon = GetOptionalString(request.Params, "icon")
+                Icon = GetOptionalString(request.Params, "icon"),
+                IsRequired = GetOptionalBool(request.Params, "isRequired")
             };
 
             _pathConfig.Paths.Add(newPath);
@@ -401,6 +402,14 @@ namespace PathStructure.WatcherHost
         private static string GetOptionalString(JsonElement root, string propertyName)
         {
             return root.TryGetProperty(propertyName, out var element) ? element.GetString() : null;
+        }
+
+        /// <summary>
+        /// Reads an optional boolean property from a JSON element.
+        /// </summary>
+        private static bool GetOptionalBool(JsonElement root, string propertyName)
+        {
+            return root.TryGetProperty(propertyName, out var element) && element.ValueKind == JsonValueKind.True;
         }
 
         /// <summary>

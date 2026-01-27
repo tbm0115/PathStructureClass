@@ -36,5 +36,10 @@ namespace PathStructure
         /// Gets or sets the icon for the path.
         /// </summary>
         public string Icon { get; set; }
+
+        /// <summary>
+        /// Gets or sets whether the path is required when variables resolve to a valid UNC path.
+        /// </summary>
+        public bool IsRequired { get; set; }
     }
 }

@@ -43,7 +43,7 @@ Emitted when a client connects.
 Adds a path regex to the current in-memory configuration and root node if it does not already exist.
 
 ```json
-{"jsonrpc":"2.0","id":"1","method":"addPath","params":{"regex":"^C:\\\\Example\\\\(?<Name>[^\\\\]+)\\\\File\\\\.txt$","name":"Example File","flavorTextTemplate":"Example {{ Name }}","backgroundColor":"#000000","foregroundColor":"#ffffff","icon":"icon.png"}}
+{"jsonrpc":"2.0","id":"1","method":"addPath","params":{"regex":"^C:\\\\Example\\\\(?<Name>[^\\\\]+)\\\\File\\\\.txt$","name":"Example File","flavorTextTemplate":"Example {{ Name }}","backgroundColor":"#000000","foregroundColor":"#ffffff","icon":"icon.png","isRequired":true}}
 ```
 
 #### Successful response

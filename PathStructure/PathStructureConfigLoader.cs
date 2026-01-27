@@ -146,7 +146,8 @@ namespace PathStructure
                     FlavorTextTemplate = ApplyNamespaceToTemplate(path.FlavorTextTemplate, prefix),
                     BackgroundColor = path.BackgroundColor,
                     ForegroundColor = path.ForegroundColor,
-                    Icon = path.Icon
+                    Icon = path.Icon,
+                    IsRequired = path.IsRequired
                 };
             }
         }
