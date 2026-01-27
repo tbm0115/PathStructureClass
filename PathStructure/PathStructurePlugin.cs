@@ -1,11 +1,12 @@
 using System.Text.Json;
+using PathStructure.Abstracts;
 
 namespace PathStructure
 {
     /// <summary>
     /// Describes a plugin entry in the configuration file.
     /// </summary>
-    public class PathStructurePlugin
+    public class PathStructurePlugin : IPathStructurePlugin
     {
         /// <summary>
         /// Gets or sets the path to the plugin assembly.

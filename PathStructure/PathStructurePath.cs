@@ -1,9 +1,11 @@
+using PathStructure.Abstracts;
+
 namespace PathStructure
 {
     /// <summary>
     /// Describes a path entry in the configuration file.
     /// </summary>
-    public class PathStructurePath
+    public class PathStructurePath : IPathStructurePath
     {
         /// <summary>
         /// Gets or sets the regex pattern for the path.

@@ -8,6 +8,21 @@ namespace PathStructure.Abstracts
     public interface IPathStructureConfig
     {
         /// <summary>
+        /// Gets the imports configured for the structure.
+        /// </summary>
+        IReadOnlyList<IPathStructureImport> Imports { get; }
+
+        /// <summary>
+        /// Gets the path patterns configured for the structure.
+        /// </summary>
+        IReadOnlyList<IPathStructurePath> Paths { get; }
+
+        /// <summary>
+        /// Gets the plugin descriptors configured for the structure.
+        /// </summary>
+        IReadOnlyList<IPathStructurePlugin> Plugins { get; }
+
+        /// <summary>
         /// Gets the root node of the configured structure.
         /// </summary>
         IPathNode Root { get; }

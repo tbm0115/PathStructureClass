@@ -26,15 +26,21 @@ namespace PathStructure
         /// </summary>
         public IList<PathStructureImport> Imports { get; set; } = new List<PathStructureImport>();
 
+        IReadOnlyList<IPathStructureImport> IPathStructureConfig.Imports => Imports;
+
         /// <summary>
         /// Gets the path patterns configured for this structure.
         /// </summary>
         public IList<PathStructurePath> Paths { get; set; } = new List<PathStructurePath>();
 
+        IReadOnlyList<IPathStructurePath> IPathStructureConfig.Paths => Paths;
+
         /// <summary>
         /// Gets the plugin descriptors configured for this structure.
         /// </summary>
         public IList<PathStructurePlugin> Plugins { get; set; } = new List<PathStructurePlugin>();
+
+        IReadOnlyList<IPathStructurePlugin> IPathStructureConfig.Plugins => Plugins;
 
         /// <inheritdoc />
         public IPathNode Root { get; private set; }
