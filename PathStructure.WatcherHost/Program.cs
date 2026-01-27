@@ -80,7 +80,7 @@ namespace PathStructure.WatcherHost
             }
             else
             {
-                var rootNode = new PathNode("Root", @"^.*$");
+                var rootNode = new PathNode("Root", @"^.*$", null, null, null, null, false);
                 config = new PathStructureConfig(rootNode);
             }
             _pathConfig = config;
@@ -230,7 +230,8 @@ namespace PathStructure.WatcherHost
                         match.FlavorTextTemplate,
                         match.BackgroundColor,
                         match.ForegroundColor,
-                        match.Icon
+                        match.Icon,
+                        isRequired = match.IsRequired
                     }).ToArray(),
                     timestamp = DateTimeOffset.Now.ToString("o")
                 }
@@ -436,7 +437,8 @@ namespace PathStructure.WatcherHost
                 path.FlavorTextTemplate,
                 path.BackgroundColor,
                 path.ForegroundColor,
-                path.Icon);
+                path.Icon,
+                path.IsRequired);
         }
 
         /// <summary>
@@ -787,7 +789,8 @@ namespace PathStructure.WatcherHost
                 metadata?.FlavorTextTemplate,
                 metadata?.BackgroundColor,
                 metadata?.ForegroundColor,
-                metadata?.Icon);
+                metadata?.Icon,
+                metadata?.IsRequired ?? false);
         }
 
         /// <summary>
@@ -846,7 +849,8 @@ namespace PathStructure.WatcherHost
                 string flavorTextTemplate,
                 string backgroundColor,
                 string foregroundColor,
-                string icon)
+                string icon,
+                bool isRequired)
             {
                 NodeName = nodeName;
                 Pattern = pattern;
@@ -856,6 +860,7 @@ namespace PathStructure.WatcherHost
                 BackgroundColor = backgroundColor;
                 ForegroundColor = foregroundColor;
                 Icon = icon;
+                IsRequired = isRequired;
             }
 
             public string NodeName { get; }
@@ -866,6 +871,7 @@ namespace PathStructure.WatcherHost
             public string BackgroundColor { get; }
             public string ForegroundColor { get; }
             public string Icon { get; }
+            public bool IsRequired { get; }
         }
 
         /// <summary>
