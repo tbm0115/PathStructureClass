@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace PathStructure.Abstracts
 {
     /// <summary>
@@ -39,5 +41,10 @@ namespace PathStructure.Abstracts
         /// Gets whether the path is required when variables resolve to a valid UNC path.
         /// </summary>
         bool IsRequired { get; }
+
+        /// <summary>
+        /// Gets nested path entries that are evaluated beneath this path.
+        /// </summary>
+        IReadOnlyList<IPathStructurePath> Paths { get; }
     }
 }

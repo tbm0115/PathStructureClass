@@ -42,13 +42,14 @@ List of other configuration files to load and merge. Imports are processed befor
 
 ### `paths`
 
-List of regex-based path entries. Each entry describes a full-path regex pattern and optional metadata.
+List of regex-based path entries. Each entry describes a path regex pattern (often per path segment) and optional metadata.
 
-- `regex` (string, required): C# regex pattern for the full path. Use named capture groups (`(?<Name>...)`) to extract variables.
+- `regex` (string, required): C# regex pattern for a path segment or prefix. Use named capture groups (`(?<Name>...)`) to extract variables.
 - `flavorTextTemplate` (string, optional): a text template that supports `{{ VariableName }}` tokens.
 - `backgroundColor` (string, optional): background color for UI clients.
 - `foregroundColor` (string, optional): foreground color for UI clients.
 - `icon` (string, optional): path to an icon for UI clients.
+- `paths` (array, optional): nested path entries evaluated beneath this path (enables hierarchical, segment-by-segment matching).
 
 ### `plugins`
 
@@ -69,5 +70,39 @@ var pathStructure = new PathStructure(config);
 The loader resolves imports, applies namespace prefixes, and builds a root node so the `PathStructure` validator can use the configured paths.
 
 ## Examples
+
+- **Nested path structure**
+
+```json
+{
+  "paths": [
+    {
+      "regex": "^C:\\\\TAMS?$",
+      "flavorTextTemplate": "TAMS MTConnect integration folder.",
+      "paths": [
+        {
+          "regex": "^mtconnect-manifest\\.json$",
+          "flavorTextTemplate": "MTConnect manifest for the TAMS installation."
+        },
+        {
+          "regex": "^Adapter$",
+          "paths": [
+            {
+              "regex": "^(?<AdapterName>[^\\\\]+)$",
+              "flavorTextTemplate": "Adapter {{ AdapterName }} installation folder.",
+              "paths": [
+                {
+                  "regex": "^appsettings\\.json$",
+                  "flavorTextTemplate": "Adapter {{ AdapterName }} configuration."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
 
 - `docs/tams-mtconnect-config.json` provides a ready-to-use configuration for the TAMS MTConnect filesystem layout.

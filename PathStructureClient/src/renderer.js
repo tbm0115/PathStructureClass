@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusElement = document.getElementById('connection-status');
   const statusMessage = document.getElementById('status-message');
   const trackedPathElement = document.getElementById('tracked-path');
+  const trackedFlavorElement = document.getElementById('tracked-flavor');
   const trackedFolderElement = document.getElementById('tracked-folder');
   const listElement = document.getElementById('path-structure-list');
   const emptyState = document.getElementById('empty-state');
@@ -93,6 +94,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (trackedPathElement) {
       trackedPathElement.textContent = payload?.trackedPath || 'No path selected.';
+    }
+
+    if (trackedFlavorElement) {
+      trackedFlavorElement.textContent = payload?.currentFlavorText || '';
+      trackedFlavorElement.hidden = !payload?.currentFlavorText;
     }
 
     if (trackedFolderElement) {

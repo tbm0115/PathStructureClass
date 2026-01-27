@@ -2,99 +2,144 @@
   "paths": [
     {
       "regex": "^C:\\\\TAMS?$",
-      "flavorTextTemplate": "TAMS MTConnect integration folder."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\mtconnect-manifest\\.json$",
-      "flavorTextTemplate": "MTConnect manifest for the TAMS installation."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Tools?$",
-      "flavorTextTemplate": "Shared tooling for TAMS integrations."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter?$",
-      "flavorTextTemplate": "Organizer folder for adapter installations."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} installation folder."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\appsettings\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} configuration."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\component-package-manifest\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} component package manifest."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\sdk-metadata\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} SDK metadata."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports?$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} SDK imports folder."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter?$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} SHDR library import folder."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter\\\\component-package-manifest\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} SHDR library import manifest."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter\\\\sdk-metadata\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} SHDR library import metadata."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter-source?$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} data source configuration folder."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter-source\\\\adapterconfig\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} data source configuration."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter-source\\\\adapterconfig\\.template\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} data configuration template."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter-source\\\\component-package-manifest\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} data source manifest."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Adapter\\\\(?<AdapterName>[^\\\\]+)\\\\Imports\\\\adapter-source\\\\sdk-metadata\\.json$",
-      "flavorTextTemplate": "Adapter {{ AdapterName }} data source metadata."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Agent?$",
-      "flavorTextTemplate": "Organizer for MTConnect agent installations."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)?$",
-      "flavorTextTemplate": "MTConnect agent {{ AgentName }} installation folder."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\bin?$",
-      "flavorTextTemplate": "MTConnect agent {{ AgentName }} EXE folder."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\[Bb]in\\\\agent\\.cfg$",
-      "flavorTextTemplate": "MTConnect agent {{ AgentName }} configuration."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\[Bb]in\\\\agent\\.exe$",
-      "flavorTextTemplate": "MTConnect agent {{ AgentName }} executable."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\[Dd]evices?$",
-      "flavorTextTemplate": "Organizer folder MTConnect agent {{ AgentName }} device definitions."
-    },
-    {
-      "regex": "^C:\\\\TAMS\\\\Agent\\\\(?<AgentName>[^\\\\]+)\\\\[Dd]evices\\\\Devices\\.xml$",
-      "flavorTextTemplate": "MTConnect agent {{ AgentName }} device definition."
+      "isRequired": true,
+      "flavorTextTemplate": "TAMS MTConnect integration folder.",
+      "paths": [
+        {
+          "regex": "^C:\\\\TAMS\\\\mtconnect-manifest\\.json$",
+          "isRequired": true,
+          "flavorTextTemplate": "MTConnect manifest for the TAMS installation."
+        },
+        {
+          "regex": "^Tools?$",
+          "flavorTextTemplate": "Shared tooling for TAMS integrations."
+        },
+        {
+          "regex": "^Adapter?$",
+          "isRequired": true,
+          "flavorTextTemplate": "Organizer folder for adapter installations.",
+          "paths": [
+            {
+              "regex": "^(?<AdapterName>[^\\\\]+)$",
+              "flavorTextTemplate": "Adapter {{ AdapterName }} installation folder.",
+              "paths": [
+                {
+                  "regex": "^appsettings\\.json$",
+                  "isRequired": true,
+                  "flavorTextTemplate": "Adapter {{ AdapterName }} configuration."
+                },
+                {
+                  "regex": "^component-package-manifest\\.json$",
+                  "isRequired": true,
+                  "flavorTextTemplate": "Adapter {{ AdapterName }} component package manifest."
+                },
+                {
+                  "regex": "^sdk-metadata\\.json$",
+                  "isRequired": true,
+                  "flavorTextTemplate": "Adapter {{ AdapterName }} SDK metadata."
+                },
+                {
+                  "regex": "^Imports?$",
+                  "isRequired": true,
+                  "flavorTextTemplate": "Adapter {{ AdapterName }} SDK imports folder.",
+                  "paths": [
+                    {
+                      "regex": "^adapter?$",
+                      "isRequired": true,
+                      "flavorTextTemplate": "Adapter {{ AdapterName }} SHDR library import folder.",
+                      "paths": [
+                        {
+                          "regex": "^component-package-manifest\\.json$",
+                          "isRequired": true,
+                          "flavorTextTemplate": "Adapter {{ AdapterName }} SHDR library import manifest."
+                        },
+                        {
+                          "regex": "^sdk-metadata\\.json$",
+                          "isRequired": true,
+                          "flavorTextTemplate": "Adapter {{ AdapterName }} SHDR library import metadata."
+                        }
+                      ]
+                    },
+                    {
+                      "regex": "^adapter-source?$",
+                      "isRequired": true,
+                      "flavorTextTemplate": "Adapter {{ AdapterName }} data source configuration folder.",
+                      "paths": [
+                        {
+                          "regex": "^adapterconfig\\.json$",
+                          "flavorTextTemplate": "Adapter {{ AdapterName }} data source configuration."
+                        },
+                        {
+                          "regex": "^adapterconfig\\.template\\.json$",
+                          "flavorTextTemplate": "Adapter {{ AdapterName }} data configuration template."
+                        },
+                        {
+                          "regex": "^component-package-manifest\\.json$",
+                          "isRequired": true,
+                          "flavorTextTemplate": "Adapter {{ AdapterName }} data source manifest."
+                        },
+                        {
+                          "regex": "^sdk-metadata\\.json$",
+                          "isRequired": true,
+                          "flavorTextTemplate": "Adapter {{ AdapterName }} data source metadata."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "regex": "^Agent?$",
+          "isRequired": true,
+          "flavorTextTemplate": "Organizer for MTConnect agent installations.",
+          "paths": [
+            {
+              "regex": "^(?<AgentName>[^\\\\]+)?$",
+              "flavorTextTemplate": "MTConnect agent {{ AgentName }} installation folder.",
+              "paths": [
+                {
+                  "regex": "^[Bb]in?$",
+                  "isRequired": true,
+                  "flavorTextTemplate": "MTConnect agent {{ AgentName }} EXE folder.",
+                  "paths": [
+                    {
+                      "regex": "^agent\\.cfg$",
+                      "isRequired": true,
+                      "flavorTextTemplate": "MTConnect agent {{ AgentName }} configuration."
+                    },
+                    {
+                      "regex": "^agent\\.exe$",
+                      "isRequired": true,
+                      "flavorTextTemplate": "MTConnect agent {{ AgentName }} executable."
+                    },
+                    {
+                      "regex": "^agent(_(.*))?\\.log$",
+                      "flavorTextTemplate": "MTConnect agent {{ AgentName }} log file."
+                    }
+                  ]
+                },
+                {
+                  "regex": "^[Dd]evices?$",
+                  "flavorTextTemplate": "Organizer folder MTConnect agent {{ AgentName }} device definitions.",
+                  "paths": [
+                    {
+                      "regex": "^.*+\\.xml$",
+                      "flavorTextTemplate": "MTConnect agent {{ AgentName }} device definition."
+                    },
+                    {
+                      "regex": "^.*+\\.xml\\.(?<Timestamp>.*+Z)$",
+                      "flavorTextTemplate": "MTConnect agent {{ AgentName }} device definition backup."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

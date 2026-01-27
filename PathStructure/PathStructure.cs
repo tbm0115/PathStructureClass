@@ -10,6 +10,7 @@ namespace PathStructure
     {
         private readonly IPathStructureConfig _config;
         private readonly IReadOnlyList<IPathValidationRule> _validationRules;
+        private static readonly char[] PathSeparators = new[] { '\\', '/' };
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PathStructure"/> class.
@@ -63,58 +64,141 @@ namespace PathStructure
             List<IPathMatchNode> matchTrail,
             out string failure)
         {
-            failure = null;
             if (node == null)
             {
                 failure = "Root node was not configured.";
                 return false;
             }
 
-            var regex = node.GetRegex(_config.RegexOptions);
-            var match = regex.Match(remainingPath);
-            if (!match.Success)
+            if (node == _config.Root)
+            {
+                if (node.Children.Count == 0)
+                {
+                    failure = "No path structures were configured.";
+                    return false;
+                }
+
+                foreach (var child in node.Children)
+                {
+                    if (TryMatchNode(child, remainingPath, variables, matchTrail, out failure))
+                    {
+                        return true;
+                    }
+                }
+
+                failure = $"No configured path matched '{remainingPath}'.";
+                return false;
+            }
+
+            failure = null;
+            if (string.IsNullOrWhiteSpace(remainingPath))
+            {
+                failure = $"Pattern '{node.Pattern}' did not match an empty path.";
+                return false;
+            }
+
+            var segments = SplitSegments(remainingPath);
+            if (segments.Count == 0)
             {
                 failure = $"Pattern '{node.Pattern}' did not match '{remainingPath}'.";
                 return false;
             }
 
-            if (!CaptureVariables(match, regex.GetGroupNames(), variables, out failure))
-            {
-                return false;
-            }
+            var separator = DetectSeparator(remainingPath);
+            var regex = node.GetRegex(_config.RegexOptions);
+            var lastFailure = $"Pattern '{node.Pattern}' did not match '{remainingPath}'.";
+            var current = string.Empty;
 
-            matchTrail.Add(new PathMatchNode(node, match.Value));
-
-            if (node.Children.Count == 0)
+            for (var index = 0; index < segments.Count; index++)
             {
-                return match.Value.Length == remainingPath.Length;
-            }
-
-            var unmatched = remainingPath.Substring(match.Value.Length).TrimStart('\\');
-            if (string.IsNullOrEmpty(unmatched))
-            {
-                return true;
-            }
-
-            foreach (var child in node.Children)
-            {
-                var childVariables = new Dictionary<string, string>(variables, StringComparer.OrdinalIgnoreCase);
-                var childTrail = new List<IPathMatchNode>(matchTrail);
-                if (TryMatchNode(child, unmatched, childVariables, childTrail, out failure))
+                current = index == 0 ? segments[index] : $"{current}{separator}{segments[index]}";
+                var match = regex.Match(current);
+                if (!match.Success || match.Index != 0 || match.Length != current.Length)
                 {
-                    variables.Clear();
-                    foreach (var kvp in childVariables)
+                    continue;
+                }
+
+                var candidateVariables = new Dictionary<string, string>(variables, StringComparer.OrdinalIgnoreCase);
+                if (!CaptureVariables(match, regex.GetGroupNames(), candidateVariables, out var candidateFailure))
+                {
+                    lastFailure = candidateFailure;
+                    continue;
+                }
+
+                var candidateTrail = new List<IPathMatchNode>(matchTrail)
+                {
+                    new PathMatchNode(node, match.Value)
+                };
+
+                var remainingSegments = segments.Skip(index + 1).ToList();
+                if (node.Children.Count == 0)
+                {
+                    if (remainingSegments.Count == 0)
                     {
-                        variables[kvp.Key] = kvp.Value;
+                        ApplyMatchOutcome(variables, matchTrail, candidateVariables, candidateTrail);
+                        return true;
                     }
 
-                    matchTrail.Clear();
-                    matchTrail.AddRange(childTrail);
+                    continue;
+                }
+
+                if (remainingSegments.Count == 0)
+                {
+                    ApplyMatchOutcome(variables, matchTrail, candidateVariables, candidateTrail);
                     return true;
+                }
+
+                var unmatched = string.Join(separator.ToString(), remainingSegments);
+                foreach (var child in node.Children)
+                {
+                    var childVariables = new Dictionary<string, string>(candidateVariables, StringComparer.OrdinalIgnoreCase);
+                    var childTrail = new List<IPathMatchNode>(candidateTrail);
+                    if (TryMatchNode(child, unmatched, childVariables, childTrail, out var childFailure))
+                    {
+                        ApplyMatchOutcome(variables, matchTrail, childVariables, childTrail);
+                        return true;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(childFailure))
+                    {
+                        lastFailure = childFailure;
+                    }
                 }
             }
 
+            failure = lastFailure;
             return false;
+        }
+
+        private static List<string> SplitSegments(string path)
+        {
+            return path.Split(PathSeparators, StringSplitOptions.RemoveEmptyEntries).ToList();
+        }
+
+        private static char DetectSeparator(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return PathSeparators[0];
+            }
+
+            return path.Contains(PathSeparators[0]) ? PathSeparators[0] : PathSeparators[1];
+        }
+
+        private static void ApplyMatchOutcome(
+            Dictionary<string, string> targetVariables,
+            List<IPathMatchNode> targetTrail,
+            Dictionary<string, string> sourceVariables,
+            List<IPathMatchNode> sourceTrail)
+        {
+            targetVariables.Clear();
+            foreach (var kvp in sourceVariables)
+            {
+                targetVariables[kvp.Key] = kvp.Value;
+            }
+
+            targetTrail.Clear();
+            targetTrail.AddRange(sourceTrail);
         }
 
         /// <summary>
