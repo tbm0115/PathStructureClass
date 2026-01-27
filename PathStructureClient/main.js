@@ -9,6 +9,7 @@ const watcherPort = Number.parseInt(process.env.PATHSTRUCTURE_WATCHER_PORT || '4
 const watcherProcessName = 'PathStructure.WatcherHost.exe';
 
 let mainWindow;
+let addPathWindow;
 let tray;
 let watcherProcess;
 let reconnectTimer;
@@ -46,6 +47,35 @@ const createWindow = () => {
   });
 
   return win;
+};
+
+const createAddPathWindow = () => {
+  if (addPathWindow) {
+    addPathWindow.focus();
+    return addPathWindow;
+  }
+
+  addPathWindow = new BrowserWindow({
+    width: 420,
+    height: 520,
+    resizable: false,
+    show: false,
+    parent: mainWindow ?? undefined,
+    modal: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'src', 'preload.js')
+    }
+  });
+
+  addPathWindow.loadFile(path.join(__dirname, 'src', 'add-path.html'));
+  addPathWindow.once('ready-to-show', () => addPathWindow.show());
+  addPathWindow.on('closed', () => {
+    addPathWindow = null;
+  });
+
+  return addPathWindow;
 };
 
 const hideToTray = () => {
@@ -303,6 +333,14 @@ ipcMain.handle('soft-reset', () => {
   }
   rpcService.disconnect();
   connectToWatcherHost();
+});
+
+ipcMain.handle('open-add-path-window', () => {
+  createAddPathWindow();
+});
+
+ipcMain.handle('client-status', (_event, status) => {
+  sendStatusUpdate(status);
 });
 
 app.on('window-all-closed', () => {

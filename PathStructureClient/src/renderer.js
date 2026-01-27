@@ -14,10 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const childPanel = document.getElementById('child-panel');
   const searchInput = document.getElementById('child-search');
   const addPathButton = document.getElementById('add-path');
-  const modalOverlay = document.getElementById('modal-overlay');
-  const addPathForm = document.getElementById('add-path-form');
-  const closeModalButton = document.getElementById('close-modal');
-  const cancelAddButton = document.getElementById('cancel-add');
   const toggleServiceButton = document.getElementById('toggle-service');
 
   let allChildren = [];
@@ -168,23 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderList();
   };
 
-  const closeModal = () => {
-    if (!modalOverlay) {
-      return;
-    }
-    modalOverlay.hidden = true;
-    if (addPathForm) {
-      addPathForm.reset();
-    }
-  };
-
-  const openModal = () => {
-    if (!modalOverlay) {
-      return;
-    }
-    modalOverlay.hidden = false;
-  };
-
   window.pathStructure?.onStatus((status) => {
     updateStatus(status);
   });
@@ -202,56 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (addPathButton) {
     addPathButton.addEventListener('click', () => {
-      openModal();
-    });
-  }
-
-  if (closeModalButton) {
-    closeModalButton.addEventListener('click', closeModal);
-  }
-
-  if (cancelAddButton) {
-    cancelAddButton.addEventListener('click', closeModal);
-  }
-
-  if (modalOverlay) {
-    modalOverlay.addEventListener('click', (event) => {
-      if (event.target === modalOverlay) {
-        closeModal();
-      }
-    });
-  }
-
-  if (addPathForm) {
-    addPathForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const formData = new FormData(addPathForm);
-      const regex = formData.get('regex');
-      if (!regex) {
-        return;
-      }
-      const payload = {
-        regex: String(regex).trim(),
-        name: String(formData.get('name') || '').trim(),
-        flavorTextTemplate: String(formData.get('flavorTextTemplate') || '').trim(),
-        isRequired: formData.get('isRequired') === 'on'
-      };
-
-      try {
-        await window.pathStructure?.sendJsonRpcRequest('addPath', payload);
-        updateStatus({
-          connected: true,
-          message: 'Path added. Reloading configuration...'
-        });
-        await window.pathStructure?.softReset();
-        closeModal();
-      } catch (error) {
-        updateStatus({
-          connected: isConnected,
-          message: 'Unable to update configuration. Please check the configuration file.'
-        });
-        console.error('Add path failed:', error);
-      }
+      window.pathStructure?.openAddPathWindow();
     });
   }
 

@@ -11,7 +11,7 @@ body {
 
 main {
   min-height: 100vh;
-  padding: 32px;
+  padding: 32px 32px 88px;
   display: grid;
   gap: 24px;
 }
@@ -24,13 +24,6 @@ h2 {
 .subtitle {
   margin: 0;
   color: #cbd5f5;
-}
-
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-  align-items: flex-start;
 }
 
 #connection-status {
@@ -252,9 +245,14 @@ h2 {
 }
 
 .status-bar {
-  margin-top: auto;
-  padding-top: 12px;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 32px;
   border-top: 1px solid #1f2937;
+  background: rgba(14, 17, 22, 0.96);
+  backdrop-filter: blur(12px);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -265,16 +263,6 @@ h2 {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(5, 7, 12, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 20;
 }
 
 .modal {
@@ -326,6 +314,13 @@ h2 {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.modal-window {
+  padding: 24px;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
 }
 
 .sr-only {
