@@ -65,7 +65,6 @@ h2 {
   align-content: start;
   height: fit-content;
   grid-auto-rows: min-content;
-  align-self: flex-start;
 }
 
 .tracked-panel h2 {
@@ -329,10 +328,6 @@ h2 {
 
 .modal-window {
   padding: 8px;
-  min-height: 100vh;
-  height: 100vh;
-  display: grid;
-  place-items: center;
 }
 
 .add-path-body {

@@ -19,8 +19,8 @@ let scaffoldMenuItem;
 
 const createWindow = () => {
   const win = new BrowserWindow({
-    width: 900,
-    height: 650,
+    width: 620,
+    height: 490,
     alwaysOnTop: true,
     show: false,
     autoHideMenuBar: false,
@@ -57,7 +57,7 @@ const createAddPathWindow = () => {
 
   addPathWindow = new BrowserWindow({
     width: 420,
-    height: 520,
+    height: 650,
     resizable: false,
     show: false,
     parent: mainWindow ?? undefined,
