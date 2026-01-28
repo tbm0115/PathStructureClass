@@ -207,6 +207,47 @@ h2 {
   color: #a5b4fc;
 }
 
+.match-selector {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.match-badge {
+  justify-self: start;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.match-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.match-item {
+  border-radius: 10px;
+  border: 1px solid #1f2a40;
+  background: #0b111c;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: #cbd5f5;
+}
+
+.match-item.selected {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.3);
+  color: #f8fafc;
+}
+
 .validation-icon {
   font-size: 0.8rem;
   display: inline-flex;

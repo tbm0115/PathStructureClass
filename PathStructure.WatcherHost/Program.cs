@@ -229,12 +229,42 @@ namespace PathStructure.WatcherHost
         {
             _lastSelectionPath = url;
             var matchSummary = FindClosestMatches(url);
-            var childMatches = FindImmediateChildMatches(url, matchSummary);
-            var hasCurrentMatch = TryGetValidationContext(url, out var currentMatch, out var variables);
-            if (!hasCurrentMatch && IsFilePath(url))
+            IReadOnlyList<PathPatternMatch> matches = Array.Empty<PathPatternMatch>();
+            var hasMatches = TryGetMatchTrail(url, out matches, out var variables);
+            if (!hasMatches && IsFilePath(url))
             {
-                hasCurrentMatch = TryGetValidationContext(Path.GetDirectoryName(url), out currentMatch, out variables);
+                hasMatches = TryGetMatchTrail(Path.GetDirectoryName(url), out matches, out variables);
             }
+            var currentMatch = hasMatches ? matches[0] : default;
+            var childMatches = hasMatches
+                ? FindImmediateChildMatches(new[] { currentMatch })
+                : FindImmediateChildMatches(url, matchSummary);
+            var matchesPayload = hasMatches
+                ? matches.Select(match => new
+                {
+                    match.NodeName,
+                    match.Pattern,
+                    match.MatchedValue,
+                    match.MatchLength,
+                    match.FlavorTextTemplate,
+                    match.BackgroundColor,
+                    match.ForegroundColor,
+                    match.Icon,
+                    isRequired = match.IsRequired,
+                    childMatches = FindImmediateChildMatches(new[] { match }).Select(child => new
+                    {
+                        child.NodeName,
+                        child.Pattern,
+                        child.MatchedValue,
+                        child.MatchLength,
+                        child.FlavorTextTemplate,
+                        child.BackgroundColor,
+                        child.ForegroundColor,
+                        child.Icon,
+                        isRequired = child.IsRequired
+                    }).ToArray()
+                }).ToArray()
+                : Array.Empty<object>();
 #if DEBUG
             LogMatches(url, matchSummary);
 #endif
@@ -246,7 +276,7 @@ namespace PathStructure.WatcherHost
                 {
                     message = "Explorer path changed.",
                     path = url,
-                    currentMatch = hasCurrentMatch ? new
+                    currentMatch = hasMatches ? new
                     {
                         currentMatch.NodeName,
                         currentMatch.Pattern,
@@ -259,6 +289,7 @@ namespace PathStructure.WatcherHost
                         isRequired = currentMatch.IsRequired
                     } : null,
                     variables = variables,
+                    matches = matchesPayload,
                     immediateChildMatches = childMatches.Select(match => new
                     {
                         match.NodeName,
@@ -1276,6 +1307,16 @@ namespace PathStructure.WatcherHost
                 return Array.Empty<PathPatternMatch>();
             }
 
+            return FindImmediateChildMatches(baseNodes);
+        }
+
+        private static IReadOnlyList<PathPatternMatch> FindImmediateChildMatches(IReadOnlyList<PathPatternMatch> baseNodes)
+        {
+            if (baseNodes == null || baseNodes.Count == 0)
+            {
+                return Array.Empty<PathPatternMatch>();
+            }
+
             var nodes = EnumerateMatchNodes().ToList();
             if (nodes.Count == 0)
             {
@@ -1445,6 +1486,32 @@ namespace PathStructure.WatcherHost
             var lastMatch = result.MatchTrail[result.MatchTrail.Count - 1];
             match = BuildPatternMatch(lastMatch);
             variables = result.Variables;
+            return true;
+        }
+
+        private static bool TryGetMatchTrail(
+            string path,
+            out IReadOnlyList<PathPatternMatch> matches,
+            out IReadOnlyDictionary<string, string> variables)
+        {
+            matches = Array.Empty<PathPatternMatch>();
+            variables = null;
+            if (_pathStructure == null || string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            var result = _pathStructure.ValidatePath(path);
+            if (!result.IsValid || result.MatchTrail.Count == 0)
+            {
+                return false;
+            }
+
+            variables = result.Variables;
+            matches = result.MatchTrail
+                .Select(BuildPatternMatch)
+                .OrderByDescending(match => match.MatchLength)
+                .ToArray();
             return true;
         }
 

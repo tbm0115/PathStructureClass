@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('pathStructure', {
   softReset: () => ipcRenderer.invoke('soft-reset'),
   openAddPathWindow: () => ipcRenderer.invoke('open-add-path-window'),
   openImportManagerWindow: () => ipcRenderer.invoke('open-import-manager-window'),
+  selectMatchIndex: (index) => ipcRenderer.invoke('select-match-index', index),
   importUrl: (url) => ipcRenderer.invoke('import-url', url),
   notifyStatus: (status) => ipcRenderer.invoke('client-status', status)
 });

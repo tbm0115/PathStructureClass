@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const trackedFlavorElement = document.getElementById('tracked-flavor');
   const trackedFolderElement = document.getElementById('tracked-folder');
   const trackedFolderGroup = document.getElementById('tracked-folder-group');
+  const matchBadge = document.getElementById('match-badge');
+  const matchList = document.getElementById('match-list');
   const listElement = document.getElementById('path-structure-list');
   const emptyState = document.getElementById('empty-state');
   const countElement = document.getElementById('child-count');
@@ -21,6 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let allChildren = [];
   let currentSearch = '';
   let isConnected = false;
+  let matches = [];
+  let selectedMatchIndex = 0;
+  let isMatchListVisible = false;
 
   const severityOrder = {
     warning: 1,
@@ -149,6 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const children = payload?.children || [];
+    matches = Array.isArray(payload?.matches) ? payload.matches : [];
+    selectedMatchIndex = Number.isInteger(payload?.selectedMatchIndex) ? payload.selectedMatchIndex : 0;
     allChildren = children;
 
     const isFileSelection =
@@ -184,6 +191,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     renderList();
+    renderMatchBadge();
+    renderMatchList();
+  };
+
+  const getMatchLabel = (match) => {
+    if (!match) {
+      return '';
+    }
+    return match.matchedValue || match.MatchedValue || match.pattern || match.Pattern || match.nodeName || match.NodeName || '';
+  };
+
+  const renderMatchBadge = () => {
+    if (!matchBadge) {
+      return;
+    }
+    if (!matches || matches.length <= 1) {
+      matchBadge.classList.add('hidden');
+      matchBadge.textContent = '';
+      if (matchList) {
+        matchList.classList.add('hidden');
+      }
+      isMatchListVisible = false;
+      return;
+    }
+    const remaining = matches.length - 1;
+    matchBadge.textContent = `${remaining} more match${remaining === 1 ? '' : 'es'}`;
+    matchBadge.classList.remove('hidden');
+  };
+
+  const renderMatchList = () => {
+    if (!matchList) {
+      return;
+    }
+    if (!matches || matches.length <= 1 || !isMatchListVisible) {
+      matchList.classList.add('hidden');
+      matchList.innerHTML = '';
+      return;
+    }
+
+    matchList.classList.remove('hidden');
+    matchList.innerHTML = '';
+    matches.forEach((match, index) => {
+      const item = document.createElement('li');
+      item.className = 'match-item';
+      if (index === selectedMatchIndex) {
+        item.classList.add('selected');
+      }
+
+      const label = document.createElement('span');
+      label.textContent = getMatchLabel(match);
+      item.appendChild(label);
+
+      item.addEventListener('click', () => {
+        if (index === selectedMatchIndex) {
+          return;
+        }
+        window.pathStructure?.selectMatchIndex(index);
+      });
+
+      matchList.appendChild(item);
+    });
   };
 
   window.pathStructure?.onStatus((status) => {
@@ -204,6 +272,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (addPathButton) {
     addPathButton.addEventListener('click', () => {
       window.pathStructure?.openAddPathWindow();
+    });
+  }
+
+  if (matchBadge) {
+    matchBadge.addEventListener('click', () => {
+      isMatchListVisible = !isMatchListVisible;
+      renderMatchList();
     });
   }
 

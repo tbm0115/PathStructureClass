@@ -114,6 +114,8 @@ class PathStructureService extends EventEmitter {
       trackedFolder: null,
       currentMatch: null,
       variables: {},
+      matches: [],
+      selectedMatchIndex: 0,
       rawChildren: [],
       children: []
     };
@@ -155,14 +157,25 @@ class PathStructureService extends EventEmitter {
 
   async handlePathChanged(params) {
     this.state.trackedPath = params?.path || null;
-    this.state.currentMatch = params?.currentMatch || null;
     this.state.variables = params?.variables || {};
-    const immediateChildren =
-      params?.immediateChildMatches ||
-      params?.ImmediateChildMatches ||
-      params?.immediateChildren ||
-      params?.children;
-    this.state.rawChildren = Array.isArray(immediateChildren) ? immediateChildren : [];
+    const matches = Array.isArray(params?.matches) ? params.matches : [];
+    if (matches.length > 0) {
+      this.state.matches = matches;
+      this.state.selectedMatchIndex = 0;
+      this.state.currentMatch = matches[0];
+      const firstChildren = matches[0]?.childMatches || [];
+      this.state.rawChildren = Array.isArray(firstChildren) ? firstChildren : [];
+    } else {
+      this.state.matches = [];
+      this.state.selectedMatchIndex = 0;
+      this.state.currentMatch = params?.currentMatch || null;
+      const immediateChildren =
+        params?.immediateChildMatches ||
+        params?.ImmediateChildMatches ||
+        params?.immediateChildren ||
+        params?.children;
+      this.state.rawChildren = Array.isArray(immediateChildren) ? immediateChildren : [];
+    }
     await this.refreshValidation();
   }
 
@@ -178,11 +191,29 @@ class PathStructureService extends EventEmitter {
     this.state.children = children;
     this.emit('update', {
       trackedPath: this.state.trackedPath,
-      trackedName: this.state.currentMatch.nodeName,
+      trackedName: this.state.currentMatch?.nodeName,
       trackedFolder: this.state.trackedFolder,
       currentFlavorText: this.buildCurrentFlavorText(),
+      matches: this.state.matches,
+      selectedMatchIndex: this.state.selectedMatchIndex,
       children: this.state.children
     });
+  }
+
+  async selectMatchIndex(index) {
+    if (!Array.isArray(this.state.matches) || this.state.matches.length === 0) {
+      return;
+    }
+
+    if (index < 0 || index >= this.state.matches.length) {
+      return;
+    }
+
+    this.state.selectedMatchIndex = index;
+    this.state.currentMatch = this.state.matches[index];
+    const childMatches = this.state.currentMatch?.childMatches || [];
+    this.state.rawChildren = Array.isArray(childMatches) ? childMatches : [];
+    await this.refreshValidation();
   }
 
   buildCurrentFlavorText() {

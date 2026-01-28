@@ -500,6 +500,19 @@ ipcMain.handle('open-import-manager-window', () => {
   createImportManagerWindow();
 });
 
+ipcMain.handle('select-match-index', async (_event, index) => {
+  if (!pathStructureService) {
+    return;
+  }
+
+  const selectedIndex = Number(index);
+  if (Number.isNaN(selectedIndex)) {
+    return;
+  }
+
+  await pathStructureService.selectMatchIndex(selectedIndex);
+});
+
 ipcMain.handle('import-url', async (_event, url) => {
   if (!url || typeof url !== 'string') {
     return;
