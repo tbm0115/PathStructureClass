@@ -180,12 +180,13 @@ class PathStructureService extends EventEmitter {
   }
 
   async refreshValidation() {
-    const trackedFolder = await this.resolveTrackedFolder(this.state.trackedPath);
+    const basePath = this.state.currentMatch?.matchedValue || this.state.trackedPath;
+    const trackedFolder = await this.resolveTrackedFolder(basePath);
     this.state.trackedFolder = trackedFolder;
 
     const entries = await this.readDirectoryEntries(trackedFolder);
     const children = this.state.rawChildren.map((child) =>
-      this.buildChildState(child, entries, trackedFolder, this.state.trackedPath, this.state.variables)
+      this.buildChildState(child, entries, trackedFolder, basePath, this.state.variables)
     );
 
     this.state.children = children;
