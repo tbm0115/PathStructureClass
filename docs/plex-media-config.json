@@ -1,0 +1,65 @@
+{
+  "paths": [
+    {
+      "regex": "^(?<LibraryName>Movies|Films)$",
+      "flavorTextTemplate": "{{ LibraryName }} library root.",
+      "paths": [
+        {
+          "regex": "^(?<MediaTitle>.+?) \\((?<ReleaseYear>\\d{4})\\)(?: \\{(?<IdSource>imdb|tmdb)-(?<ExternalId>[^\\}]+)\\})?(?: \\{edition-(?<EditionName>[^\\}]{1,32})\\})?$",
+          "flavorTextTemplate": "{{ LibraryName }} folder: {{ MediaTitle }} ({{ ReleaseYear }})",
+          "paths": [
+            {
+              "regex": "^(?<MediaTitle>.+?) \\((?<ReleaseYear>\\d{4})\\)(?: \\{(?<IdSource>imdb|tmdb)-(?<ExternalId>[^\\}]+)\\})?(?: \\{edition-(?<EditionName>[^\\}]{1,32})\\})?\\.(?<VideoExt>mkv|mp4|m4v|avi|mov|wmv)$",
+              "flavorTextTemplate": "{{ LibraryName }} file: {{ MediaTitle }} ({{ ReleaseYear }}).{{ VideoExt }}"
+            },
+            {
+              "regex": "^(?<MediaTitle>.+?) \\((?<ReleaseYear>\\d{4})\\)(?: \\{(?<IdSource>imdb|tmdb)-(?<ExternalId>[^\\}]+)\\})?(?: \\{edition-(?<EditionName>[^\\}]{1,32})\\})?\\.(?<Lang>[a-z]{2}(?:-[A-Z]{2})?)\\.srt$",
+              "flavorTextTemplate": "{{ LibraryName }} subtitle: {{ MediaTitle }} ({{ ReleaseYear }}) [{{ Lang }}].srt"
+            }
+          ]
+        },
+        {
+          "regex": "^(?<MediaTitle>.+?) \\((?<ReleaseYear>\\d{4})\\)(?: \\{(?<IdSource>imdb|tmdb)-(?<ExternalId>[^\\}]+)\\})?(?: \\{edition-(?<EditionName>[^\\}]{1,32})\\})?\\.(?<VideoExt>mkv|mp4|m4v|avi|mov|wmv)$",
+          "flavorTextTemplate": "{{ LibraryName }} stand-alone file: {{ MediaTitle }} ({{ ReleaseYear }}).{{ VideoExt }}"
+        }
+      ]
+    },
+
+    {
+      "regex": "^(?<LibraryName>TV Shows|TV|Television)$",
+      "flavorTextTemplate": "{{ LibraryName }} library root.",
+      "paths": [
+        {
+          "regex": "^(?<ShowTitle>.+?)(?: \\((?<ShowYear>\\d{4})\\))?(?: \\{(?<ShowIdSource>tmdb|tvdb|imdb)-(?<ShowExternalId>[^\\}]+)\\})?$",
+          "flavorTextTemplate": "{{ LibraryName }} show folder: {{ ShowTitle }}{{#if ShowYear}} ({{ ShowYear }}){{/if}}",
+          "paths": [
+            {
+              "regex": "^Season (?<SeasonNumber>\\d{2})$",
+              "flavorTextTemplate": "{{ LibraryName }} season folder: Season {{ SeasonNumber }}",
+              "paths": [
+                {
+                  "regex": "^(?<MediaTitle>.+?)(?: \\((?<ShowYear>\\d{4})\\))?\\s*[-._ ]\\s*[sS](?<SeasonNumber>\\d{2})[eE](?<EpisodeNumber>\\d{2})(?:\\s*[-._ ]\\s*(?<EpisodeTitle>.*?))?\\.(?<VideoExt>mkv|mp4|m4v|avi|mov|wmv)$",
+                  "flavorTextTemplate": "{{ LibraryName }} episode: {{ MediaTitle }} - S{{ SeasonNumber }}E{{ EpisodeNumber }}{{#if EpisodeTitle}} - {{ EpisodeTitle }}{{/if }}"
+                },
+                {
+                  "regex": "^(?<MediaTitle>.+?)(?: \\((?<ShowYear>\\d{4})\\))?\\s*[-._ ]\\s*(?<AirDate>(?:\\d{4}[- .]\\d{2}[- .]\\d{2})|(?:\\d{2}[- .]\\d{2}[- .]\\d{4}))(?:\\s*[-._ ]\\s*(?<EpisodeTitle>.*?))?\\.(?<VideoExt>mkv|mp4|m4v|avi|mov|wmv)$",
+                  "flavorTextTemplate": "{{ LibraryName }} episode (date-based): {{ MediaTitle }} - {{ AirDate }}{{#if EpisodeTitle}} - {{ EpisodeTitle }}{{/if }}"
+                }
+              ]
+            },
+            {
+              "regex": "^(?:Specials|Season 00)$",
+              "flavorTextTemplate": "{{ LibraryName }} specials folder: Season 00",
+              "paths": [
+                {
+                  "regex": "^(?<MediaTitle>.+?)(?: \\((?<ShowYear>\\d{4})\\))?\\s*[-._ ]\\s*[sS]00[eE](?<EpisodeNumber>\\d{2})(?:\\s*[-._ ]\\s*(?<EpisodeTitle>.*?))?\\.(?<VideoExt>mkv|mp4|m4v|avi|mov|wmv)$",
+                  "flavorTextTemplate": "{{ LibraryName }} special: {{ MediaTitle }} - S00E{{ EpisodeNumber }}{{#if EpisodeTitle}} - {{ EpisodeTitle }}{{/if }}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

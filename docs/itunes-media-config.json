@@ -1,0 +1,189 @@
+{
+  "imports": [],
+  "paths": [
+    {
+      "regex": "^(?<LibraryName>iTunes)$",
+      "flavorTextTemplate": "{{ LibraryName }} folder.",
+      "paths": [
+        {
+          "regex": "^(?<MediaRootName>iTunes Media)$",
+          "flavorTextTemplate": "{{ LibraryName }} media root: {{ MediaRootName }}",
+          "paths": [
+            {
+              "regex": "^(?<CategoryName>Music)$",
+              "flavorTextTemplate": "{{ CategoryName }} category.",
+              "paths": [
+                {
+                  "regex": "^(?<ArtistName>[^\\\\/]+)$",
+                  "flavorTextTemplate": "{{ CategoryName }} artist: {{ ArtistName }}",
+                  "paths": [
+                    {
+                      "regex": "^(?<AlbumName>[^\\\\/]+)$",
+                      "flavorTextTemplate": "{{ CategoryName }} album: {{ AlbumName }}",
+                      "paths": [
+                        {
+                          "regex": "^(?<TrackNumber>\\d{2})(?:\\s+|\\s*-\\s*|\\.)?(?<TrackTitle>.+?)\\.(?<AudioExt>mp3|m4a|aac|alac|aiff|wav|flac|ogg|opus)$",
+                          "flavorTextTemplate": "{{ CategoryName }} track {{ TrackNumber }}: {{ TrackTitle }}.{{ AudioExt }}"
+                        },
+                        {
+                          "regex": "^(?:cover|folder|artwork|front)\\.(?<ImageExt>jpg|jpeg|png|webp)$",
+                          "flavorTextTemplate": "{{ CategoryName }} album artwork."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+
+            {
+              "regex": "^(?<CategoryName>Movies)$",
+              "flavorTextTemplate": "{{ CategoryName }} category.",
+              "paths": [
+                {
+                  "regex": "^(?<MediaTitle>.+?)\\.(?<VideoExt>m4v|mp4|mov|mkv|avi|wmv)$",
+                  "flavorTextTemplate": "{{ CategoryName }} item: {{ MediaTitle }}.{{ VideoExt }}"
+                }
+              ]
+            },
+
+            {
+              "regex": "^(?<CategoryName>TV Shows)$",
+              "flavorTextTemplate": "{{ CategoryName }} category.",
+              "paths": [
+                {
+                  "regex": "^(?<ShowTitle>[^\\\\/]+)$",
+                  "flavorTextTemplate": "{{ CategoryName }} show: {{ ShowTitle }}",
+                  "paths": [
+                    {
+                      "regex": "^(?<SeasonFolderName>Season) (?<SeasonNumber>\\d{1,2})$",
+                      "flavorTextTemplate": "{{ ShowTitle }} {{ SeasonFolderName }} {{ SeasonNumber }}",
+                      "paths": [
+                        {
+                          "regex": "^(?<ShowTitle>.+?)\\s*[-._ ]\\s*[sS](?<SeasonNumber>\\d{2})[eE](?<EpisodeNumber>\\d{2})(?:\\s*[-._ ]\\s*(?<EpisodeTitle>.*?))?\\.(?<VideoExt>m4v|mp4|mov|mkv|avi|wmv)$",
+                          "flavorTextTemplate": "{{ CategoryName }} episode: {{ ShowTitle }} - S{{ SeasonNumber }}E{{ EpisodeNumber }}{{#if EpisodeTitle}} - {{ EpisodeTitle }}{{/if }}"
+                        }
+                      ]
+                    },
+                    {
+                      "regex": "^(?<SpecialsFolderName>Specials|Season 0|Season 00)$",
+                      "flavorTextTemplate": "{{ ShowTitle }} specials folder.",
+                      "paths": [
+                        {
+                          "regex": "^(?<ShowTitle>.+?)\\s*[-._ ]\\s*[sS]00[eE](?<EpisodeNumber>\\d{2})(?:\\s*[-._ ]\\s*(?<EpisodeTitle>.*?))?\\.(?<VideoExt>m4v|mp4|mov|mkv|avi|wmv)$",
+                          "flavorTextTemplate": "{{ CategoryName }} special: {{ ShowTitle }} - S00E{{ EpisodeNumber }}{{#if EpisodeTitle}} - {{ EpisodeTitle }}{{/if }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+
+            {
+              "regex": "^(?<CategoryName>Podcasts)$",
+              "flavorTextTemplate": "{{ CategoryName }} category.",
+              "paths": [
+                {
+                  "regex": "^(?<PodcastName>[^\\\\/]+)$",
+                  "flavorTextTemplate": "{{ CategoryName }} show: {{ PodcastName }}",
+                  "paths": [
+                    {
+                      "regex": "^(?<EpisodeTitle>.+?)\\.(?<AudioExt>mp3|m4a|aac|alac|aiff|wav)$",
+                      "flavorTextTemplate": "{{ CategoryName }} episode: {{ EpisodeTitle }}.{{ AudioExt }}"
+                    }
+                  ]
+                }
+              ]
+            },
+
+            {
+              "regex": "^(?<CategoryName>Audiobooks)$",
+              "flavorTextTemplate": "{{ CategoryName }} category.",
+              "paths": [
+                {
+                  "regex": "^(?<AuthorOrSeries>[^\\\\/]+)$",
+                  "flavorTextTemplate": "{{ CategoryName }} author/series: {{ AuthorOrSeries }}",
+                  "paths": [
+                    {
+                      "regex": "^(?<BookTitle>[^\\\\/]+)$",
+                      "flavorTextTemplate": "{{ CategoryName }} title: {{ BookTitle }}",
+                      "paths": [
+                        {
+                          "regex": "^(?<PartOrChapter>.+?)\\.(?<AudioExt>m4b|m4a|mp3|aac|alac|aiff|wav)$",
+                          "flavorTextTemplate": "{{ CategoryName }} part: {{ PartOrChapter }}.{{ AudioExt }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+
+            {
+              "regex": "^(?<CategoryName>Books)$",
+              "flavorTextTemplate": "{{ CategoryName }} category.",
+              "paths": [
+                {
+                  "regex": "^(?<BookFileName>.+?)\\.(?<BookExt>epub|pdf)$",
+                  "flavorTextTemplate": "{{ CategoryName }} item: {{ BookFileName }}.{{ BookExt }}"
+                }
+              ]
+            },
+
+            {
+              "regex": "^(?<CategoryName>Ringtones)$",
+              "flavorTextTemplate": "{{ CategoryName }} category.",
+              "paths": [
+                {
+                  "regex": "^(?<ToneName>.+?)\\.(?<ToneExt>m4r)$",
+                  "flavorTextTemplate": "{{ CategoryName }} tone: {{ ToneName }}.{{ ToneExt }}"
+                }
+              ]
+            },
+
+            {
+              "regex": "^(?<CategoryName>Mobile Applications)$",
+              "flavorTextTemplate": "{{ CategoryName }} category.",
+              "paths": [
+                {
+                  "regex": "^(?<AppName>.+?)\\.(?<AppExt>ipa)$",
+                  "flavorTextTemplate": "{{ CategoryName }} app: {{ AppName }}.{{ AppExt }}"
+                }
+              ]
+            },
+
+            {
+              "regex": "^(?<CategoryName>iTunes U)$",
+              "flavorTextTemplate": "{{ CategoryName }} category.",
+              "paths": [
+                {
+                  "regex": "^(?<CourseOrCollection>[^\\\\/]+)$",
+                  "flavorTextTemplate": "{{ CategoryName }} collection: {{ CourseOrCollection }}",
+                  "paths": [
+                    {
+                      "regex": "^(?<ItemName>.+?)\\.(?<Ext>mp4|m4v|mov|mp3|m4a|pdf|epub)$",
+                      "flavorTextTemplate": "{{ CategoryName }} item: {{ ItemName }}.{{ Ext }}"
+                    }
+                  ]
+                }
+              ]
+            },
+
+            {
+              "regex": "^(?<AutoAddFolderName>Automatically Add to iTunes)$",
+              "flavorTextTemplate": "{{ AutoAddFolderName }} drop folder (import/watch).",
+              "paths": [
+                {
+                  "regex": "^(?<IncomingFileName>.+?)\\.(?<IncomingExt>mp3|m4a|aac|alac|aiff|wav|flac|m4v|mp4|mov|mkv|avi|wmv|m4b|epub|pdf|m4r|ipa)$",
+                  "flavorTextTemplate": "Incoming: {{ IncomingFileName }}.{{ IncomingExt }}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "plugins": []
+}
