@@ -184,13 +184,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const name = document.createElement('strong');
     name.className = 'path-name';
-    name.textContent = child.displayName || '';
+    let usedFlavorAsLabel = false;
+    if (Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1) {
+      const label = child.displayName || child.flavorText || '';
+      if (label) {
+        name.textContent = label;
+        usedFlavorAsLabel = !child.displayName && Boolean(child.flavorText);
+      } else if (child.pattern) {
+        const code = document.createElement('code');
+        code.textContent = child.pattern;
+        name.appendChild(code);
+      }
+    } else {
+      name.textContent = child.displayName || '';
+    }
 
     mainRow.appendChild(name);
 
     item.appendChild(mainRow);
 
-    if (child.flavorText) {
+    if (child.flavorText && !usedFlavorAsLabel) {
       const flavor = document.createElement('div');
       flavor.className = 'path-flavor';
       flavor.textContent = child.flavorText;
