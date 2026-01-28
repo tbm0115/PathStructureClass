@@ -1508,12 +1508,42 @@ namespace PathStructure.WatcherHost
             }
 
             variables = result.Variables;
+            var normalizedLength = GetNormalizedPathLength(path);
             matches = result.MatchTrail
                 .Select(BuildPatternMatch)
+                .Where(match => IsFullPathMatch(match, normalizedLength))
                 .OrderByDescending(match => match.MatchLength)
                 .ThenByDescending(match => match.MatchedValue?.Length ?? 0)
                 .ToArray();
-            return true;
+            return matches.Count > 0;
+        }
+
+        private static int GetNormalizedPathLength(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return 0;
+            }
+
+            var normalized = path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
+                .TrimEnd(Path.DirectorySeparatorChar);
+            return normalized.Length;
+        }
+
+        private static bool IsFullPathMatch(PathPatternMatch match, int normalizedLength)
+        {
+            if (normalizedLength == 0)
+            {
+                return false;
+            }
+
+            if (match.MatchLength == normalizedLength)
+            {
+                return true;
+            }
+
+            var matchedLength = match.MatchedValue?.Length ?? 0;
+            return matchedLength == normalizedLength;
         }
 
         /// <summary>
