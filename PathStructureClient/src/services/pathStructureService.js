@@ -322,7 +322,9 @@ class PathStructureService extends EventEmitter {
 
     const groupNames = extractGroupNames(pattern);
     const templateTokens = extractTemplateTokens(flavorTextTemplate);
-    const missingTokens = templateTokens.filter((token) => !groupNames.includes(token));
+    const missingTokens = templateTokens.filter((token) =>
+      !groupNames.includes(token) && !(variables && Object.prototype.hasOwnProperty.call(variables, token))
+    );
     if (missingTokens.length > 0) {
       exceptions.push({
         severity: 'warning',
