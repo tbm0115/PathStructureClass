@@ -84,7 +84,8 @@ namespace PathStructure
 
                     importedConfig = LoadFromFileInternal(importPath, activeImports);
                 }
-                mergedPaths.AddRange(ApplyNamespace(importedConfig.Paths, import.Namespace));
+                var importedPaths = ApplyImportRoot(importedConfig.Paths, import.RootPath);
+                mergedPaths.AddRange(ApplyNamespace(importedPaths, import.Namespace));
                 mergedPlugins.AddRange(importedConfig.Plugins);
             }
 
@@ -146,7 +147,8 @@ namespace PathStructure
                     importedConfig = LoadFromUrlInternal(resolvedUri, activeImports);
                 }
 
-                mergedPaths.AddRange(ApplyNamespace(importedConfig.Paths, import.Namespace));
+                var importedPaths = ApplyImportRoot(importedConfig.Paths, import.RootPath);
+                mergedPaths.AddRange(ApplyNamespace(importedPaths, import.Namespace));
                 mergedPlugins.AddRange(importedConfig.Plugins);
             }
 
@@ -255,6 +257,79 @@ namespace PathStructure
 
                 yield return ApplyNamespaceToPath(path, prefix);
             }
+        }
+
+        private static IEnumerable<PathStructurePath> ApplyImportRoot(IEnumerable<PathStructurePath> paths, string importRoot)
+        {
+            if (paths == null)
+            {
+                yield break;
+            }
+
+            if (string.IsNullOrWhiteSpace(importRoot))
+            {
+                foreach (var path in paths)
+                {
+                    if (path != null)
+                    {
+                        yield return path;
+                    }
+                }
+
+                yield break;
+            }
+
+            foreach (var path in paths)
+            {
+                if (path == null)
+                {
+                    continue;
+                }
+
+                yield return ApplyImportRootToPath(path, importRoot);
+            }
+        }
+
+        private static PathStructurePath ApplyImportRootToPath(PathStructurePath path, string importRoot)
+        {
+            if (path == null)
+            {
+                return null;
+            }
+
+            return new PathStructurePath
+            {
+                Regex = ApplyImportRootToRegex(path.Regex, importRoot),
+                Name = path.Name,
+                FlavorTextTemplate = path.FlavorTextTemplate,
+                BackgroundColor = path.BackgroundColor,
+                ForegroundColor = path.ForegroundColor,
+                Icon = path.Icon,
+                IsRequired = path.IsRequired,
+                Paths = path.Paths
+            };
+        }
+
+        private static string ApplyImportRootToRegex(string regex, string importRoot)
+        {
+            if (string.IsNullOrWhiteSpace(regex) || string.IsNullOrWhiteSpace(importRoot))
+            {
+                return regex;
+            }
+
+            var trimmedRoot = importRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (string.IsNullOrWhiteSpace(trimmedRoot))
+            {
+                return regex;
+            }
+
+            var prefix = Regex.Escape($"{trimmedRoot}{Path.DirectorySeparatorChar}");
+            if (regex.StartsWith("^", StringComparison.Ordinal))
+            {
+                return "^" + prefix + regex.Substring(1);
+            }
+
+            return prefix + regex;
         }
 
         private static PathStructurePath ApplyNamespaceToPath(PathStructurePath path, string prefix)

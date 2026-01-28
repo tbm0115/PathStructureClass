@@ -385,6 +385,15 @@ namespace PathStructure.WatcherHost
                     case "importPathStructure":
                         await HandleImportPathCommandAsync(request, stream).ConfigureAwait(false);
                         break;
+                    case "listImports":
+                        await HandleListImportsCommandAsync(request, stream).ConfigureAwait(false);
+                        break;
+                    case "updateImport":
+                        await HandleUpdateImportCommandAsync(request, stream).ConfigureAwait(false);
+                        break;
+                    case "removeImport":
+                        await HandleRemoveImportCommandAsync(request, stream).ConfigureAwait(false);
+                        break;
                     default:
                         await SendJsonRpcErrorAsync(stream, request.Id, -32601, $"Unknown method '{request.Method}'.", null).ConfigureAwait(false);
                         break;
@@ -502,6 +511,8 @@ namespace PathStructure.WatcherHost
 
             var filePath = GetOptionalString(request.Params, "filePath");
             var url = GetOptionalString(request.Params, "url");
+            var importNamespace = NormalizeOptionalString(GetOptionalString(request.Params, "namespace"));
+            var rootPath = NormalizeOptionalString(GetOptionalString(request.Params, "rootPath"));
             if (string.IsNullOrWhiteSpace(filePath) && string.IsNullOrWhiteSpace(url))
             {
                 await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Provide a filePath or url.", null).ConfigureAwait(false);
@@ -560,7 +571,12 @@ namespace PathStructure.WatcherHost
                 return;
             }
 
-            rawConfig.Imports.Add(new PathStructureImport { Path = importedLocation });
+            rawConfig.Imports.Add(new PathStructureImport
+            {
+                Path = importedLocation,
+                Namespace = importNamespace,
+                RootPath = rootPath
+            });
 
             try
             {
@@ -584,6 +600,193 @@ namespace PathStructure.WatcherHost
         }
 
         /// <summary>
+        /// Handles the JSON-RPC listImports request.
+        /// </summary>
+        private static async Task HandleListImportsCommandAsync(JsonRpcRequest request, NetworkStream stream)
+        {
+            var configPath = GetActiveConfigPath();
+            if (string.IsNullOrWhiteSpace(configPath))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32003, "Unable to determine config file path.", null).ConfigureAwait(false);
+                return;
+            }
+
+            PathStructureConfig rawConfig;
+            try
+            {
+                rawConfig = LoadRawConfig(configPath);
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32004, "Unable to load config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            await SendJsonRpcResultAsync(stream, request.Id, new
+            {
+                imports = rawConfig.Imports?.Select(import => new
+                {
+                    path = import.Path,
+                    @namespace = import.Namespace,
+                    rootPath = import.RootPath
+                }).ToList() ?? new List<object>()
+            }).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Handles the JSON-RPC updateImport request.
+        /// </summary>
+        private static async Task HandleUpdateImportCommandAsync(JsonRpcRequest request, NetworkStream stream)
+        {
+            if (request.Params.ValueKind != JsonValueKind.Object)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Missing request parameters.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var importPath = GetOptionalString(request.Params, "path");
+            if (string.IsNullOrWhiteSpace(importPath))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Missing required 'path' property.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var configPath = GetActiveConfigPath();
+            if (string.IsNullOrWhiteSpace(configPath))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32003, "Unable to determine config file path.", null).ConfigureAwait(false);
+                return;
+            }
+
+            PathStructureConfig rawConfig;
+            try
+            {
+                rawConfig = LoadRawConfig(configPath);
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32004, "Unable to load config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            var targetImport = rawConfig.Imports.FirstOrDefault(import =>
+                string.Equals(import.Path, importPath, StringComparison.OrdinalIgnoreCase));
+
+            if (targetImport == null)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32008, "Import not found.", importPath).ConfigureAwait(false);
+                return;
+            }
+
+            if (request.Params.TryGetProperty("namespace", out var namespaceElement))
+            {
+                var value = namespaceElement.ValueKind == JsonValueKind.Null
+                    ? null
+                    : namespaceElement.GetString();
+                targetImport.Namespace = NormalizeOptionalString(value);
+            }
+
+            if (request.Params.TryGetProperty("rootPath", out var rootPathElement))
+            {
+                var value = rootPathElement.ValueKind == JsonValueKind.Null
+                    ? null
+                    : rootPathElement.GetString();
+                targetImport.RootPath = NormalizeOptionalString(value);
+            }
+
+            try
+            {
+                SaveConfig(configPath, rawConfig);
+                if (string.Equals(configPath, _configFilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    ReloadConfiguration(configPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32005, "Unable to save config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            await SendJsonRpcResultAsync(stream, request.Id, new
+            {
+                message = "Import updated.",
+                import = new
+                {
+                    path = targetImport.Path,
+                    @namespace = targetImport.Namespace,
+                    rootPath = targetImport.RootPath
+                }
+            }).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Handles the JSON-RPC removeImport request.
+        /// </summary>
+        private static async Task HandleRemoveImportCommandAsync(JsonRpcRequest request, NetworkStream stream)
+        {
+            if (request.Params.ValueKind != JsonValueKind.Object)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Missing request parameters.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var importPath = GetOptionalString(request.Params, "path");
+            if (string.IsNullOrWhiteSpace(importPath))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Missing required 'path' property.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var configPath = GetActiveConfigPath();
+            if (string.IsNullOrWhiteSpace(configPath))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32003, "Unable to determine config file path.", null).ConfigureAwait(false);
+                return;
+            }
+
+            PathStructureConfig rawConfig;
+            try
+            {
+                rawConfig = LoadRawConfig(configPath);
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32004, "Unable to load config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            var removed = rawConfig.Imports.RemoveAll(import =>
+                string.Equals(import.Path, importPath, StringComparison.OrdinalIgnoreCase));
+
+            if (removed == 0)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32008, "Import not found.", importPath).ConfigureAwait(false);
+                return;
+            }
+
+            try
+            {
+                SaveConfig(configPath, rawConfig);
+                if (string.Equals(configPath, _configFilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    ReloadConfiguration(configPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32005, "Unable to save config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            await SendJsonRpcResultAsync(stream, request.Id, new
+            {
+                message = "Import removed.",
+                importPath
+            }).ConfigureAwait(false);
+        }
+
+        /// <summary>
         /// Reads an optional string property from a JSON element.
         /// </summary>
         private static string GetOptionalString(JsonElement root, string propertyName)
@@ -597,6 +800,16 @@ namespace PathStructure.WatcherHost
         private static bool GetOptionalBool(JsonElement root, string propertyName)
         {
             return root.TryGetProperty(propertyName, out var element) && element.ValueKind == JsonValueKind.True;
+        }
+
+        private static string NormalizeOptionalString(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return value.Trim();
         }
 
         private static string GetActiveConfigPath()

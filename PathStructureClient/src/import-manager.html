@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manage Imports</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="modal-window">
+      <section class="child-panel import-panel">
+        <div class="child-panel-header">
+          <div>
+            <h2>Imported configurations</h2>
+            <p class="subtitle">Review imported configs and set optional root paths.</p>
+          </div>
+          <button id="refresh-imports" class="ghost-button" type="button">Refresh</button>
+        </div>
+        <div class="child-panel-content">
+          <ul id="import-list" class="path-list"></ul>
+          <p id="import-empty" class="empty-state">No imports are configured yet.</p>
+        </div>
+      </section>
+      <p id="import-status" class="muted"></p>
+    </main>
+    <script src="import-manager.js"></script>
+  </body>
+</html>

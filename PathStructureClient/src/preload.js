@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('pathStructure', {
   stopService: () => ipcRenderer.invoke('watcher-stop'),
   softReset: () => ipcRenderer.invoke('soft-reset'),
   openAddPathWindow: () => ipcRenderer.invoke('open-add-path-window'),
+  openImportManagerWindow: () => ipcRenderer.invoke('open-import-manager-window'),
   importUrl: (url) => ipcRenderer.invoke('import-url', url),
   notifyStatus: (status) => ipcRenderer.invoke('client-status', status)
 });

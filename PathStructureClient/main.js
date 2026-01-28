@@ -11,6 +11,7 @@ const watcherProcessName = 'PathStructure.WatcherHost.exe';
 let mainWindow;
 let addPathWindow;
 let importUrlWindow;
+let importManagerWindow;
 let tray;
 let watcherProcess;
 let reconnectTimer;
@@ -108,6 +109,35 @@ const createImportUrlWindow = () => {
   return importUrlWindow;
 };
 
+const createImportManagerWindow = () => {
+  if (importManagerWindow) {
+    importManagerWindow.focus();
+    return importManagerWindow;
+  }
+
+  importManagerWindow = new BrowserWindow({
+    width: 560,
+    height: 640,
+    resizable: true,
+    show: false,
+    parent: mainWindow ?? undefined,
+    modal: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'src', 'preload.js')
+    }
+  });
+
+  importManagerWindow.loadFile(path.join(__dirname, 'src', 'import-manager.html'));
+  importManagerWindow.once('ready-to-show', () => importManagerWindow.show());
+  importManagerWindow.on('closed', () => {
+    importManagerWindow = null;
+  });
+
+  return importManagerWindow;
+};
+
 const hideToTray = () => {
   if (!mainWindow) {
     return;
@@ -182,6 +212,12 @@ const createAppMenu = () => {
           label: 'Import Configuration URL...',
           click: () => {
             createImportUrlWindow();
+          }
+        },
+        {
+          label: 'Manage Imports...',
+          click: () => {
+            createImportManagerWindow();
           }
         }
       ]
@@ -422,6 +458,10 @@ ipcMain.handle('soft-reset', () => {
 
 ipcMain.handle('open-add-path-window', () => {
   createAddPathWindow();
+});
+
+ipcMain.handle('open-import-manager-window', () => {
+  createImportManagerWindow();
 });
 
 ipcMain.handle('import-url', async (_event, url) => {

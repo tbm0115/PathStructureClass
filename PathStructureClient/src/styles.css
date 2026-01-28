@@ -153,6 +153,23 @@ h2 {
   gap: 6px;
 }
 
+.import-item .path-item-header {
+  align-items: flex-start;
+}
+
+.import-fields {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
 .path-item-header {
   display: flex;
   align-items: center;
