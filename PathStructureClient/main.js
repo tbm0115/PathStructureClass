@@ -358,13 +358,52 @@ const connectToWatcherHost = () => {
   rpcService.connect();
 };
 
-const sendImportRequest = async (params) => {
+const ensureRpcConnection = async () => {
   if (!rpcService) {
-    sendStatusUpdate({ connected: false, message: 'JSON-RPC service not available.' });
+    connectToWatcherHost();
+  }
+
+  if (!rpcService) {
+    throw new Error('JSON-RPC service not available.');
+  }
+
+  if (rpcService.isConnected()) {
     return;
   }
 
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timed out waiting for JSON-RPC connection.'));
+    }, 2000);
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      rpcService.removeListener('connected', handleConnected);
+      rpcService.removeListener('error', handleError);
+      rpcService.removeListener('disconnected', handleError);
+    };
+
+    const handleConnected = () => {
+      cleanup();
+      resolve();
+    };
+
+    const handleError = (error) => {
+      cleanup();
+      reject(error || new Error('Unable to connect to JSON-RPC service.'));
+    };
+
+    rpcService.on('connected', handleConnected);
+    rpcService.on('error', handleError);
+    rpcService.on('disconnected', handleError);
+    rpcService.connect();
+  });
+};
+
+const sendImportRequest = async (params) => {
   try {
+    await ensureRpcConnection();
     await rpcService.sendRequest('importPathStructure', params);
     sendStatusUpdate({ connected: true, message: 'Import added. Reloading configuration...' });
     rpcService.disconnect();
@@ -420,10 +459,7 @@ ipcMain.handle('show-window', () => {
 });
 
 ipcMain.handle('json-rpc-request', (_event, payload) => {
-  if (!rpcService) {
-    return Promise.reject(new Error('JSON-RPC service not available.'));
-  }
-  return rpcService.sendRequest(payload?.method, payload?.params);
+  return ensureRpcConnection().then(() => rpcService.sendRequest(payload?.method, payload?.params));
 });
 
 ipcMain.handle('scaffold-required-folders', async () => {

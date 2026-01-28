@@ -26,6 +26,10 @@ class JsonRpcService extends EventEmitter {
     this.socket.on('error', (error) => this.handleError(error));
   }
 
+  isConnected() {
+    return Boolean(this.socket && this.socket.readyState === 'open');
+  }
+
   disconnect() {
     if (!this.socket) {
       return;
