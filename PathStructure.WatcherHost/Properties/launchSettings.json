@@ -2,7 +2,7 @@
   "profiles": {
     "PathStructure.WatcherHost": {
       "commandName": "Project",
-      "commandLineArgs": "\"C:\\Users\\LightWorks\\Source\\Repos\\PathStructureClass\\docs\\tams-mtconnect-config.json\""
+      "commandLineArgs": ""
     }
   }
 }
