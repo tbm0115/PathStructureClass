@@ -334,18 +334,23 @@ class PathStructureService extends EventEmitter {
 
     let matchedEntry = null;
     let matchedEntryResult = null;
+    const matchingEntries = [];
     if (regex && entryInfo?.entries?.length) {
-      matchedEntry = entryInfo.entries.find((entry) => {
-        matchedEntryResult = regex.exec(entry.fullPath);
-        if (matchedEntryResult?.length) {
-          return true;
+      entryInfo.entries.forEach((entry) => {
+        let result = regex.exec(entry.fullPath);
+        if (!result?.length) {
+          result = regex.exec(normalizePath(entry.fullPath));
         }
-        matchedEntryResult = regex.exec(normalizePath(entry.fullPath));
-        if (matchedEntryResult?.length) {
-          return true;
+        if (!result?.length) {
+          result = regex.exec(entry.name);
         }
-        matchedEntryResult = regex.exec(entry.name);
-        return Boolean(matchedEntryResult?.length);
+        if (result?.length) {
+          matchingEntries.push({ entry, result });
+          if (!matchedEntry) {
+            matchedEntry = entry;
+            matchedEntryResult = result;
+          }
+        }
       });
     }
 
@@ -380,6 +385,11 @@ class PathStructureService extends EventEmitter {
     }
 
     const displayName = matchedEntry?.name || nodeName || sanitizeName(pattern);
+    let displayPath = displayName;
+    if (matchedEntry?.fullPath && trackedFolder) {
+      const relativePath = path.relative(trackedFolder, matchedEntry.fullPath);
+      displayPath = relativePath.startsWith('..') ? matchedEntry.fullPath : relativePath;
+    }
     const literalPath =
       matchedEntry?.fullPath ||
       (trackedFolder && displayName ? path.join(trackedFolder, displayName) : null) ||
@@ -392,6 +402,7 @@ class PathStructureService extends EventEmitter {
 
     return {
       displayName,
+      displayPath,
       literalPath,
       flavorText,
       pattern,
@@ -399,6 +410,7 @@ class PathStructureService extends EventEmitter {
       icon,
       backgroundColor,
       foregroundColor,
+      matchingPaths: matchingEntries.map((item) => item.entry.fullPath),
       trackedFolder,
       exists,
       isFile,

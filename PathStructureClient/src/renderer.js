@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const pathLabel = document.createElement('span');
     pathLabel.className = 'path-item-label';
-    pathLabel.textContent = child.literalPath || '';
+    pathLabel.textContent = child.displayPath || child.literalPath || '';
     pathRow.appendChild(pathLabel);
 
     if (child.isRequired) {
@@ -87,6 +87,94 @@ document.addEventListener('DOMContentLoaded', () => {
       icon.textContent = '●';
       icon.title = child.exceptions.map((exception) => exception.message).join('\n');
       pathRow.appendChild(icon);
+    }
+
+    if (Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1) {
+      const trimTrackedFolder = (value) => {
+        if (!value || !child.trackedFolder) {
+          return value || '';
+        }
+        const normalizedFolder = child.trackedFolder.endsWith('\\') || child.trackedFolder.endsWith('/')
+          ? child.trackedFolder
+          : `${child.trackedFolder}${value.includes('/') ? '/' : '\\'}`;
+        return value.startsWith(normalizedFolder) ? value.slice(normalizedFolder.length) : value;
+      };
+
+      const badge = document.createElement('button');
+      badge.type = 'button';
+      badge.className = 'match-count-badge';
+      badge.textContent = `+${child.matchingPaths.length - 1}`;
+      pathRow.appendChild(badge);
+
+      const matchList = document.createElement('div');
+      matchList.className = 'child-match-list hidden';
+      item.appendChild(matchList);
+
+      const pageSize = 5;
+      let page = 0;
+
+      const renderMatchList = () => {
+        matchList.innerHTML = '';
+        const start = page * pageSize;
+        const end = start + pageSize;
+        const slice = child.matchingPaths.slice(start, end);
+
+        const list = document.createElement('ul');
+        list.className = 'child-match-paths';
+
+        slice.forEach((matchPath) => {
+          const listItem = document.createElement('li');
+          listItem.textContent = trimTrackedFolder(matchPath);
+          list.appendChild(listItem);
+        });
+
+        matchList.appendChild(list);
+
+        if (child.matchingPaths.length > pageSize) {
+          const controls = document.createElement('div');
+          controls.className = 'child-match-controls';
+
+          const prev = document.createElement('button');
+          prev.type = 'button';
+          prev.className = 'ghost-button';
+          prev.textContent = 'Prev';
+          prev.disabled = page === 0;
+          prev.addEventListener('click', () => {
+            if (page > 0) {
+              page -= 1;
+              renderMatchList();
+            }
+          });
+
+          const next = document.createElement('button');
+          next.type = 'button';
+          next.className = 'ghost-button';
+          next.textContent = 'Next';
+          next.disabled = end >= child.matchingPaths.length;
+          next.addEventListener('click', () => {
+            if (end < child.matchingPaths.length) {
+              page += 1;
+              renderMatchList();
+            }
+          });
+
+          const count = document.createElement('span');
+          count.className = 'child-match-count';
+          count.textContent = `${start + 1}-${Math.min(end, child.matchingPaths.length)} of ${child.matchingPaths.length}`;
+
+          controls.appendChild(prev);
+          controls.appendChild(count);
+          controls.appendChild(next);
+          matchList.appendChild(controls);
+        }
+      };
+
+      badge.addEventListener('click', () => {
+        matchList.classList.toggle('hidden');
+        if (!matchList.classList.contains('hidden')) {
+          renderMatchList();
+        }
+      });
     }
 
     item.appendChild(pathRow);
@@ -123,8 +211,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
       }
       const query = currentSearch.toLowerCase();
+      const matchPaths = Array.isArray(child.matchingPaths) ? child.matchingPaths.join(' ') : '';
       return (
         child.literalPath?.toLowerCase().includes(query) ||
+        matchPaths.toLowerCase().includes(query) ||
         child.displayName?.toLowerCase().includes(query) ||
         child.flavorText?.toLowerCase().includes(query)
       );
