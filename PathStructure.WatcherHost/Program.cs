@@ -622,14 +622,16 @@ namespace PathStructure.WatcherHost
                 return;
             }
 
+            var imports = rawConfig.Imports?.Select(import => new
+            {
+                path = import.Path,
+                @namespace = import.Namespace,
+                rootPath = import.RootPath
+            }) ?? Enumerable.Empty<object>();
+
             await SendJsonRpcResultAsync(stream, request.Id, new
             {
-                imports = rawConfig.Imports?.Select(import => new
-                {
-                    path = import.Path,
-                    @namespace = import.Namespace,
-                    rootPath = import.RootPath
-                }).ToList() ?? new List<object>()
+                imports
             }).ConfigureAwait(false);
         }
 
@@ -756,8 +758,7 @@ namespace PathStructure.WatcherHost
                 return;
             }
 
-            var removed = rawConfig.Imports.RemoveAll(import =>
-                string.Equals(import.Path, importPath, StringComparison.OrdinalIgnoreCase));
+            var removed = RemoveImport(rawConfig.Imports, importPath);
 
             if (removed == 0)
             {
@@ -810,6 +811,34 @@ namespace PathStructure.WatcherHost
             }
 
             return value.Trim();
+        }
+
+        private static int RemoveImport(IList<PathStructureImport> imports, string importPath)
+        {
+            if (imports == null || string.IsNullOrWhiteSpace(importPath))
+            {
+                return 0;
+            }
+
+            var removed = 0;
+            for (var index = imports.Count - 1; index >= 0; index -= 1)
+            {
+                var existing = imports[index];
+                if (existing == null)
+                {
+                    continue;
+                }
+
+                if (!string.Equals(existing.Path, importPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                imports.RemoveAt(index);
+                removed += 1;
+            }
+
+            return removed;
         }
 
         private static string GetActiveConfigPath()
