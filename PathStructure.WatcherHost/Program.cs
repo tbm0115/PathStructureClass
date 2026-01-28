@@ -1511,6 +1511,7 @@ namespace PathStructure.WatcherHost
             matches = result.MatchTrail
                 .Select(BuildPatternMatch)
                 .OrderByDescending(match => match.MatchLength)
+                .ThenByDescending(match => match.MatchedValue?.Length ?? 0)
                 .ToArray();
             return true;
         }
