@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const statusElement = document.getElementById('connection-status');
   const statusMessage = document.getElementById('status-message');
+  const trackedNameElement = document.getElementById('tracked-name');
   const trackedPathElement = document.getElementById('tracked-path');
   const trackedFlavorElement = document.getElementById('tracked-flavor');
   const trackedFolderElement = document.getElementById('tracked-folder');
@@ -59,21 +60,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const item = document.createElement('li');
     item.className = 'path-item';
 
-    const mainRow = document.createElement('div');
-    mainRow.className = 'path-item-main';
+    const pathRow = document.createElement('div');
+    pathRow.className = 'path-item-header';
 
-    const name = document.createElement('span');
-    name.className = 'path-name';
-    name.textContent = child.displayName || child.literalPath;
+    const pathLabel = document.createElement('span');
+    pathLabel.className = 'path-item-label';
+    pathLabel.textContent = child.literalPath || '';
+    pathRow.appendChild(pathLabel);
 
     if (child.isRequired) {
       const badge = document.createElement('span');
       badge.className = 'required-badge';
       badge.textContent = 'Required';
-      name.appendChild(badge);
+      pathRow.appendChild(badge);
     }
-
-    mainRow.appendChild(name);
 
     const severity = getMaxSeverity(child.exceptions);
     if (severity) {
@@ -81,8 +81,19 @@ document.addEventListener('DOMContentLoaded', () => {
       icon.className = `validation-icon severity-${severity}`;
       icon.textContent = '●';
       icon.title = child.exceptions.map((exception) => exception.message).join('\n');
-      mainRow.appendChild(icon);
+      pathRow.appendChild(icon);
     }
+
+    item.appendChild(pathRow);
+
+    const mainRow = document.createElement('div');
+    mainRow.className = 'path-item-main';
+
+    const name = document.createElement('strong');
+    name.className = 'path-name';
+    name.textContent = child.displayName || '';
+
+    mainRow.appendChild(name);
 
     item.appendChild(mainRow);
 
@@ -149,8 +160,12 @@ document.addEventListener('DOMContentLoaded', () => {
       childPanel.hidden = isFileSelection;
     }
 
+    if (trackedNameElement) {
+      trackedNameElement.textContent = payload?.trackedName || '';
+    }
+
     if (trackedPathElement) {
-      trackedPathElement.textContent = payload?.trackedName || payload?.trackedPath || 'No path selected.';
+      trackedPathElement.textContent = payload?.trackedPath || 'No path selected.';
     }
 
     if (trackedFlavorElement) {
@@ -201,4 +216,5 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
 });

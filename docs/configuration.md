@@ -37,7 +37,7 @@ PathStructure uses a JSON configuration file to describe valid paths, optional U
 
 List of other configuration files to load and merge. Imports are processed before the local file, so local entries override imported entries if your client merges them.
 
-- `path` (string, required): path to the JSON configuration file. Relative paths are resolved relative to the current file.
+- `path` (string, required): path or URL to the JSON configuration file. Relative paths are resolved relative to the current file (or the current URL when importing from a URL).
 - `namespace` (string, optional): namespace prefix applied to variables from the imported file. The loader prefixes named capture groups and template tokens with `<namespace>_` to avoid collisions.
 
 ### `paths`
