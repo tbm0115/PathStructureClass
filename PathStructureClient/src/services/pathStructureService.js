@@ -114,6 +114,8 @@ class PathStructureService extends EventEmitter {
       trackedFolder: null,
       currentMatch: null,
       variables: {},
+      matches: [],
+      selectedMatchIndex: 0,
       rawChildren: [],
       children: []
     };
@@ -155,34 +157,64 @@ class PathStructureService extends EventEmitter {
 
   async handlePathChanged(params) {
     this.state.trackedPath = params?.path || null;
-    this.state.currentMatch = params?.currentMatch || null;
     this.state.variables = params?.variables || {};
-    const immediateChildren =
-      params?.immediateChildMatches ||
-      params?.ImmediateChildMatches ||
-      params?.immediateChildren ||
-      params?.children;
-    this.state.rawChildren = Array.isArray(immediateChildren) ? immediateChildren : [];
+    const matches = Array.isArray(params?.matches) ? params.matches : [];
+    if (matches.length > 0) {
+      this.state.matches = matches;
+      this.state.selectedMatchIndex = 0;
+      this.state.currentMatch = matches[0];
+      const firstChildren = matches[0]?.childMatches || [];
+      this.state.rawChildren = Array.isArray(firstChildren) ? firstChildren : [];
+    } else {
+      this.state.matches = [];
+      this.state.selectedMatchIndex = 0;
+      this.state.currentMatch = params?.currentMatch || null;
+      const immediateChildren =
+        params?.immediateChildMatches ||
+        params?.ImmediateChildMatches ||
+        params?.immediateChildren ||
+        params?.children;
+      this.state.rawChildren = Array.isArray(immediateChildren) ? immediateChildren : [];
+    }
     await this.refreshValidation();
   }
 
   async refreshValidation() {
-    const trackedFolder = await this.resolveTrackedFolder(this.state.trackedPath);
+    const basePath = this.state.currentMatch?.matchedValue || this.state.trackedPath;
+    const trackedFolder = await this.resolveTrackedFolder(basePath);
     this.state.trackedFolder = trackedFolder;
 
     const entries = await this.readDirectoryEntries(trackedFolder);
     const children = this.state.rawChildren.map((child) =>
-      this.buildChildState(child, entries, trackedFolder, this.state.trackedPath, this.state.variables)
+      this.buildChildState(child, entries, trackedFolder, basePath, this.state.variables)
     );
 
     this.state.children = children;
     this.emit('update', {
       trackedPath: this.state.trackedPath,
-      trackedName: this.state.currentMatch.nodeName,
+      trackedName: this.state.currentMatch?.nodeName,
       trackedFolder: this.state.trackedFolder,
       currentFlavorText: this.buildCurrentFlavorText(),
+      matches: this.state.matches,
+      selectedMatchIndex: this.state.selectedMatchIndex,
       children: this.state.children
     });
+  }
+
+  async selectMatchIndex(index) {
+    if (!Array.isArray(this.state.matches) || this.state.matches.length === 0) {
+      return;
+    }
+
+    if (index < 0 || index >= this.state.matches.length) {
+      return;
+    }
+
+    this.state.selectedMatchIndex = index;
+    this.state.currentMatch = this.state.matches[index];
+    const childMatches = this.state.currentMatch?.childMatches || [];
+    this.state.rawChildren = Array.isArray(childMatches) ? childMatches : [];
+    await this.refreshValidation();
   }
 
   buildCurrentFlavorText() {
@@ -290,7 +322,9 @@ class PathStructureService extends EventEmitter {
 
     const groupNames = extractGroupNames(pattern);
     const templateTokens = extractTemplateTokens(flavorTextTemplate);
-    const missingTokens = templateTokens.filter((token) => !groupNames.includes(token));
+    const missingTokens = templateTokens.filter((token) =>
+      !groupNames.includes(token) && !(variables && Object.prototype.hasOwnProperty.call(variables, token))
+    );
     if (missingTokens.length > 0) {
       exceptions.push({
         severity: 'warning',
@@ -300,18 +334,23 @@ class PathStructureService extends EventEmitter {
 
     let matchedEntry = null;
     let matchedEntryResult = null;
+    const matchingEntries = [];
     if (regex && entryInfo?.entries?.length) {
-      matchedEntry = entryInfo.entries.find((entry) => {
-        matchedEntryResult = regex.exec(entry.fullPath);
-        if (matchedEntryResult?.length) {
-          return true;
+      entryInfo.entries.forEach((entry) => {
+        let result = regex.exec(entry.fullPath);
+        if (!result?.length) {
+          result = regex.exec(normalizePath(entry.fullPath));
         }
-        matchedEntryResult = regex.exec(normalizePath(entry.fullPath));
-        if (matchedEntryResult?.length) {
-          return true;
+        if (!result?.length) {
+          result = regex.exec(entry.name);
         }
-        matchedEntryResult = regex.exec(entry.name);
-        return Boolean(matchedEntryResult?.length);
+        if (result?.length) {
+          matchingEntries.push({ entry, result });
+          if (!matchedEntry) {
+            matchedEntry = entry;
+            matchedEntryResult = result;
+          }
+        }
       });
     }
 
@@ -346,6 +385,11 @@ class PathStructureService extends EventEmitter {
     }
 
     const displayName = matchedEntry?.name || nodeName || sanitizeName(pattern);
+    let displayPath = displayName;
+    if (matchedEntry?.fullPath && trackedFolder) {
+      const relativePath = path.relative(trackedFolder, matchedEntry.fullPath);
+      displayPath = relativePath.startsWith('..') ? matchedEntry.fullPath : relativePath;
+    }
     const literalPath =
       matchedEntry?.fullPath ||
       (trackedFolder && displayName ? path.join(trackedFolder, displayName) : null) ||
@@ -358,6 +402,7 @@ class PathStructureService extends EventEmitter {
 
     return {
       displayName,
+      displayPath,
       literalPath,
       flavorText,
       pattern,
@@ -365,6 +410,7 @@ class PathStructureService extends EventEmitter {
       icon,
       backgroundColor,
       foregroundColor,
+      matchingPaths: matchingEntries.map((item) => item.entry.fullPath),
       trackedFolder,
       exists,
       isFile,

@@ -2,7 +2,7 @@
   "paths": [
     {
 			"name": "TAMS integration folder",
-      "regex": "^C:\\\\TAMS?$",
+      "regex": "^TAMS?$",
       "isRequired": true,
       "flavorTextTemplate": "TAMS MTConnect integration folder.",
       "paths": [
@@ -140,12 +140,12 @@
                   "paths": [
                     {
 											"name": "Agent device configuration",
-                      "regex": "^.*+\\.xml$",
+                      "regex": "^.*\\.xml$",
                       "flavorTextTemplate": "{{ AgentName }} MTConnect agent device definition."
                     },
                     {
 											"name": "Backup Agent device configuration",
-                      "regex": "^.*+\\.xml\\.(?<Timestamp>.*+Z)$",
+                      "regex": "^.*\\.xml\\.(?<Timestamp>.*?Z)$",
                       "flavorTextTemplate": "{{ AgentName }} MTConnect agent device definition backup."
                     }
                   ]

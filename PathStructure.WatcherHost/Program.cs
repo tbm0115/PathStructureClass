@@ -229,12 +229,42 @@ namespace PathStructure.WatcherHost
         {
             _lastSelectionPath = url;
             var matchSummary = FindClosestMatches(url);
-            var childMatches = FindImmediateChildMatches(url, matchSummary);
-            var hasCurrentMatch = TryGetValidationContext(url, out var currentMatch, out var variables);
-            if (!hasCurrentMatch && IsFilePath(url))
+            IReadOnlyList<PathPatternMatch> matches = Array.Empty<PathPatternMatch>();
+            var hasMatches = TryGetMatchTrail(url, out matches, out var variables);
+            if (!hasMatches && IsFilePath(url))
             {
-                hasCurrentMatch = TryGetValidationContext(Path.GetDirectoryName(url), out currentMatch, out variables);
+                hasMatches = TryGetMatchTrail(Path.GetDirectoryName(url), out matches, out variables);
             }
+            var currentMatch = hasMatches ? matches[0] : default;
+            var childMatches = hasMatches
+                ? FindImmediateChildMatches(new[] { currentMatch })
+                : FindImmediateChildMatches(url, matchSummary);
+            var matchesPayload = hasMatches
+                ? matches.Select(match => new
+                {
+                    match.NodeName,
+                    match.Pattern,
+                    match.MatchedValue,
+                    match.MatchLength,
+                    match.FlavorTextTemplate,
+                    match.BackgroundColor,
+                    match.ForegroundColor,
+                    match.Icon,
+                    isRequired = match.IsRequired,
+                    childMatches = FindImmediateChildMatches(new[] { match }).Select(child => new
+                    {
+                        child.NodeName,
+                        child.Pattern,
+                        child.MatchedValue,
+                        child.MatchLength,
+                        child.FlavorTextTemplate,
+                        child.BackgroundColor,
+                        child.ForegroundColor,
+                        child.Icon,
+                        isRequired = child.IsRequired
+                    }).ToArray()
+                }).ToArray()
+                : Array.Empty<object>();
 #if DEBUG
             LogMatches(url, matchSummary);
 #endif
@@ -246,7 +276,7 @@ namespace PathStructure.WatcherHost
                 {
                     message = "Explorer path changed.",
                     path = url,
-                    currentMatch = hasCurrentMatch ? new
+                    currentMatch = hasMatches ? new
                     {
                         currentMatch.NodeName,
                         currentMatch.Pattern,
@@ -259,6 +289,7 @@ namespace PathStructure.WatcherHost
                         isRequired = currentMatch.IsRequired
                     } : null,
                     variables = variables,
+                    matches = matchesPayload,
                     immediateChildMatches = childMatches.Select(match => new
                     {
                         match.NodeName,
@@ -385,6 +416,15 @@ namespace PathStructure.WatcherHost
                     case "importPathStructure":
                         await HandleImportPathCommandAsync(request, stream).ConfigureAwait(false);
                         break;
+                    case "listImports":
+                        await HandleListImportsCommandAsync(request, stream).ConfigureAwait(false);
+                        break;
+                    case "updateImport":
+                        await HandleUpdateImportCommandAsync(request, stream).ConfigureAwait(false);
+                        break;
+                    case "removeImport":
+                        await HandleRemoveImportCommandAsync(request, stream).ConfigureAwait(false);
+                        break;
                     default:
                         await SendJsonRpcErrorAsync(stream, request.Id, -32601, $"Unknown method '{request.Method}'.", null).ConfigureAwait(false);
                         break;
@@ -502,6 +542,8 @@ namespace PathStructure.WatcherHost
 
             var filePath = GetOptionalString(request.Params, "filePath");
             var url = GetOptionalString(request.Params, "url");
+            var importNamespace = NormalizeOptionalString(GetOptionalString(request.Params, "namespace"));
+            var rootPath = NormalizeOptionalString(GetOptionalString(request.Params, "rootPath"));
             if (string.IsNullOrWhiteSpace(filePath) && string.IsNullOrWhiteSpace(url))
             {
                 await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Provide a filePath or url.", null).ConfigureAwait(false);
@@ -560,7 +602,12 @@ namespace PathStructure.WatcherHost
                 return;
             }
 
-            rawConfig.Imports.Add(new PathStructureImport { Path = importedLocation });
+            rawConfig.Imports.Add(new PathStructureImport
+            {
+                Path = importedLocation,
+                Namespace = importNamespace,
+                RootPath = rootPath
+            });
 
             try
             {
@@ -584,6 +631,194 @@ namespace PathStructure.WatcherHost
         }
 
         /// <summary>
+        /// Handles the JSON-RPC listImports request.
+        /// </summary>
+        private static async Task HandleListImportsCommandAsync(JsonRpcRequest request, NetworkStream stream)
+        {
+            var configPath = GetActiveConfigPath();
+            if (string.IsNullOrWhiteSpace(configPath))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32003, "Unable to determine config file path.", null).ConfigureAwait(false);
+                return;
+            }
+
+            PathStructureConfig rawConfig;
+            try
+            {
+                rawConfig = LoadRawConfig(configPath);
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32004, "Unable to load config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            var imports = rawConfig.Imports?.Select(import => new
+            {
+                path = import.Path,
+                @namespace = import.Namespace,
+                rootPath = import.RootPath
+            }) ?? Enumerable.Empty<object>();
+
+            await SendJsonRpcResultAsync(stream, request.Id, new
+            {
+                imports
+            }).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Handles the JSON-RPC updateImport request.
+        /// </summary>
+        private static async Task HandleUpdateImportCommandAsync(JsonRpcRequest request, NetworkStream stream)
+        {
+            if (request.Params.ValueKind != JsonValueKind.Object)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Missing request parameters.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var importPath = GetOptionalString(request.Params, "path");
+            if (string.IsNullOrWhiteSpace(importPath))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Missing required 'path' property.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var configPath = GetActiveConfigPath();
+            if (string.IsNullOrWhiteSpace(configPath))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32003, "Unable to determine config file path.", null).ConfigureAwait(false);
+                return;
+            }
+
+            PathStructureConfig rawConfig;
+            try
+            {
+                rawConfig = LoadRawConfig(configPath);
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32004, "Unable to load config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            var targetImport = rawConfig.Imports.FirstOrDefault(import =>
+                string.Equals(import.Path, importPath, StringComparison.OrdinalIgnoreCase));
+
+            if (targetImport == null)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32008, "Import not found.", importPath).ConfigureAwait(false);
+                return;
+            }
+
+            if (request.Params.TryGetProperty("namespace", out var namespaceElement))
+            {
+                var value = namespaceElement.ValueKind == JsonValueKind.Null
+                    ? null
+                    : namespaceElement.GetString();
+                targetImport.Namespace = NormalizeOptionalString(value);
+            }
+
+            if (request.Params.TryGetProperty("rootPath", out var rootPathElement))
+            {
+                var value = rootPathElement.ValueKind == JsonValueKind.Null
+                    ? null
+                    : rootPathElement.GetString();
+                targetImport.RootPath = NormalizeOptionalString(value);
+            }
+
+            try
+            {
+                SaveConfig(configPath, rawConfig);
+                if (string.Equals(configPath, _configFilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    ReloadConfiguration(configPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32005, "Unable to save config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            await SendJsonRpcResultAsync(stream, request.Id, new
+            {
+                message = "Import updated.",
+                import = new
+                {
+                    path = targetImport.Path,
+                    @namespace = targetImport.Namespace,
+                    rootPath = targetImport.RootPath
+                }
+            }).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Handles the JSON-RPC removeImport request.
+        /// </summary>
+        private static async Task HandleRemoveImportCommandAsync(JsonRpcRequest request, NetworkStream stream)
+        {
+            if (request.Params.ValueKind != JsonValueKind.Object)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Missing request parameters.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var importPath = GetOptionalString(request.Params, "path");
+            if (string.IsNullOrWhiteSpace(importPath))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32602, "Missing required 'path' property.", null).ConfigureAwait(false);
+                return;
+            }
+
+            var configPath = GetActiveConfigPath();
+            if (string.IsNullOrWhiteSpace(configPath))
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32003, "Unable to determine config file path.", null).ConfigureAwait(false);
+                return;
+            }
+
+            PathStructureConfig rawConfig;
+            try
+            {
+                rawConfig = LoadRawConfig(configPath);
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32004, "Unable to load config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            var removed = RemoveImport(rawConfig.Imports, importPath);
+
+            if (removed == 0)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32008, "Import not found.", importPath).ConfigureAwait(false);
+                return;
+            }
+
+            try
+            {
+                SaveConfig(configPath, rawConfig);
+                if (string.Equals(configPath, _configFilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    ReloadConfiguration(configPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                await SendJsonRpcErrorAsync(stream, request.Id, -32005, "Unable to save config file.", ex.Message).ConfigureAwait(false);
+                return;
+            }
+
+            await SendJsonRpcResultAsync(stream, request.Id, new
+            {
+                message = "Import removed.",
+                importPath
+            }).ConfigureAwait(false);
+        }
+
+        /// <summary>
         /// Reads an optional string property from a JSON element.
         /// </summary>
         private static string GetOptionalString(JsonElement root, string propertyName)
@@ -597,6 +832,44 @@ namespace PathStructure.WatcherHost
         private static bool GetOptionalBool(JsonElement root, string propertyName)
         {
             return root.TryGetProperty(propertyName, out var element) && element.ValueKind == JsonValueKind.True;
+        }
+
+        private static string NormalizeOptionalString(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return value.Trim();
+        }
+
+        private static int RemoveImport(IList<PathStructureImport> imports, string importPath)
+        {
+            if (imports == null || string.IsNullOrWhiteSpace(importPath))
+            {
+                return 0;
+            }
+
+            var removed = 0;
+            for (var index = imports.Count - 1; index >= 0; index -= 1)
+            {
+                var existing = imports[index];
+                if (existing == null)
+                {
+                    continue;
+                }
+
+                if (!string.Equals(existing.Path, importPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                imports.RemoveAt(index);
+                removed += 1;
+            }
+
+            return removed;
         }
 
         private static string GetActiveConfigPath()
@@ -1034,6 +1307,16 @@ namespace PathStructure.WatcherHost
                 return Array.Empty<PathPatternMatch>();
             }
 
+            return FindImmediateChildMatches(baseNodes);
+        }
+
+        private static IReadOnlyList<PathPatternMatch> FindImmediateChildMatches(IReadOnlyList<PathPatternMatch> baseNodes)
+        {
+            if (baseNodes == null || baseNodes.Count == 0)
+            {
+                return Array.Empty<PathPatternMatch>();
+            }
+
             var nodes = EnumerateMatchNodes().ToList();
             if (nodes.Count == 0)
             {
@@ -1204,6 +1487,63 @@ namespace PathStructure.WatcherHost
             match = BuildPatternMatch(lastMatch);
             variables = result.Variables;
             return true;
+        }
+
+        private static bool TryGetMatchTrail(
+            string path,
+            out IReadOnlyList<PathPatternMatch> matches,
+            out IReadOnlyDictionary<string, string> variables)
+        {
+            matches = Array.Empty<PathPatternMatch>();
+            variables = null;
+            if (_pathStructure == null || string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            var result = _pathStructure.ValidatePath(path);
+            if (!result.IsValid || result.MatchTrail.Count == 0)
+            {
+                return false;
+            }
+
+            variables = result.Variables;
+            var normalizedLength = GetNormalizedPathLength(path);
+            matches = result.MatchTrail
+                .Select(BuildPatternMatch)
+                .Where(match => IsFullPathMatch(match, normalizedLength))
+                .OrderByDescending(match => match.MatchLength)
+                .ThenByDescending(match => match.MatchedValue?.Length ?? 0)
+                .ToArray();
+            return matches.Count > 0;
+        }
+
+        private static int GetNormalizedPathLength(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return 0;
+            }
+
+            var normalized = path.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
+                .TrimEnd(Path.DirectorySeparatorChar);
+            return normalized.Length;
+        }
+
+        private static bool IsFullPathMatch(PathPatternMatch match, int normalizedLength)
+        {
+            if (normalizedLength == 0)
+            {
+                return false;
+            }
+
+            if (match.MatchLength == normalizedLength)
+            {
+                return true;
+            }
+
+            var matchedLength = match.MatchedValue?.Length ?? 0;
+            return matchedLength == normalizedLength;
         }
 
         /// <summary>

@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const trackedFlavorElement = document.getElementById('tracked-flavor');
   const trackedFolderElement = document.getElementById('tracked-folder');
   const trackedFolderGroup = document.getElementById('tracked-folder-group');
+  const matchBadge = document.getElementById('match-badge');
+  const matchList = document.getElementById('match-list');
   const listElement = document.getElementById('path-structure-list');
   const emptyState = document.getElementById('empty-state');
   const countElement = document.getElementById('child-count');
@@ -21,6 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let allChildren = [];
   let currentSearch = '';
   let isConnected = false;
+  let matches = [];
+  let selectedMatchIndex = 0;
+  let isMatchListVisible = false;
 
   const severityOrder = {
     warning: 1,
@@ -65,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const pathLabel = document.createElement('span');
     pathLabel.className = 'path-item-label';
-    pathLabel.textContent = child.literalPath || '';
+    pathLabel.textContent = child.displayPath || child.literalPath || '';
     pathRow.appendChild(pathLabel);
 
     if (child.isRequired) {
@@ -84,6 +89,94 @@ document.addEventListener('DOMContentLoaded', () => {
       pathRow.appendChild(icon);
     }
 
+    if (Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1) {
+      const trimTrackedFolder = (value) => {
+        if (!value || !child.trackedFolder) {
+          return value || '';
+        }
+        const normalizedFolder = child.trackedFolder.endsWith('\\') || child.trackedFolder.endsWith('/')
+          ? child.trackedFolder
+          : `${child.trackedFolder}${value.includes('/') ? '/' : '\\'}`;
+        return value.startsWith(normalizedFolder) ? value.slice(normalizedFolder.length) : value;
+      };
+
+      const badge = document.createElement('button');
+      badge.type = 'button';
+      badge.className = 'match-count-badge';
+      badge.textContent = `+${child.matchingPaths.length - 1}`;
+      pathRow.appendChild(badge);
+
+      const matchList = document.createElement('div');
+      matchList.className = 'child-match-list hidden';
+      item.appendChild(matchList);
+
+      const pageSize = 5;
+      let page = 0;
+
+      const renderMatchList = () => {
+        matchList.innerHTML = '';
+        const start = page * pageSize;
+        const end = start + pageSize;
+        const slice = child.matchingPaths.slice(start, end);
+
+        const list = document.createElement('ul');
+        list.className = 'child-match-paths';
+
+        slice.forEach((matchPath) => {
+          const listItem = document.createElement('li');
+          listItem.textContent = trimTrackedFolder(matchPath);
+          list.appendChild(listItem);
+        });
+
+        matchList.appendChild(list);
+
+        if (child.matchingPaths.length > pageSize) {
+          const controls = document.createElement('div');
+          controls.className = 'child-match-controls';
+
+          const prev = document.createElement('button');
+          prev.type = 'button';
+          prev.className = 'ghost-button';
+          prev.textContent = 'Prev';
+          prev.disabled = page === 0;
+          prev.addEventListener('click', () => {
+            if (page > 0) {
+              page -= 1;
+              renderMatchList();
+            }
+          });
+
+          const next = document.createElement('button');
+          next.type = 'button';
+          next.className = 'ghost-button';
+          next.textContent = 'Next';
+          next.disabled = end >= child.matchingPaths.length;
+          next.addEventListener('click', () => {
+            if (end < child.matchingPaths.length) {
+              page += 1;
+              renderMatchList();
+            }
+          });
+
+          const count = document.createElement('span');
+          count.className = 'child-match-count';
+          count.textContent = `${start + 1}-${Math.min(end, child.matchingPaths.length)} of ${child.matchingPaths.length}`;
+
+          controls.appendChild(prev);
+          controls.appendChild(count);
+          controls.appendChild(next);
+          matchList.appendChild(controls);
+        }
+      };
+
+      badge.addEventListener('click', () => {
+        matchList.classList.toggle('hidden');
+        if (!matchList.classList.contains('hidden')) {
+          renderMatchList();
+        }
+      });
+    }
+
     item.appendChild(pathRow);
 
     const mainRow = document.createElement('div');
@@ -91,13 +184,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const name = document.createElement('strong');
     name.className = 'path-name';
-    name.textContent = child.displayName || '';
+    let usedFlavorAsLabel = false;
+    if (Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1) {
+      const label = child.displayName || child.flavorText || '';
+      if (label) {
+        name.textContent = label;
+        usedFlavorAsLabel = !child.displayName && Boolean(child.flavorText);
+      } else if (child.pattern) {
+        const code = document.createElement('code');
+        code.textContent = child.pattern;
+        name.appendChild(code);
+      }
+    } else {
+      name.textContent = child.displayName || '';
+    }
 
     mainRow.appendChild(name);
 
     item.appendChild(mainRow);
 
-    if (child.flavorText) {
+    if (child.flavorText && !usedFlavorAsLabel) {
       const flavor = document.createElement('div');
       flavor.className = 'path-flavor';
       flavor.textContent = child.flavorText;
@@ -118,8 +224,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
       }
       const query = currentSearch.toLowerCase();
+      const matchPaths = Array.isArray(child.matchingPaths) ? child.matchingPaths.join(' ') : '';
       return (
         child.literalPath?.toLowerCase().includes(query) ||
+        matchPaths.toLowerCase().includes(query) ||
         child.displayName?.toLowerCase().includes(query) ||
         child.flavorText?.toLowerCase().includes(query)
       );
@@ -149,6 +257,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const children = payload?.children || [];
+    matches = Array.isArray(payload?.matches) ? payload.matches : [];
+    selectedMatchIndex = Number.isInteger(payload?.selectedMatchIndex) ? payload.selectedMatchIndex : 0;
     allChildren = children;
 
     const isFileSelection =
@@ -184,6 +294,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     renderList();
+    renderMatchBadge();
+    renderMatchList();
+  };
+
+  const getMatchLabel = (match) => {
+    if (!match) {
+      return '';
+    }
+    return match.matchedValue || match.MatchedValue || match.pattern || match.Pattern || match.nodeName || match.NodeName || '';
+  };
+
+  const renderMatchBadge = () => {
+    if (!matchBadge) {
+      return;
+    }
+    if (!matches || matches.length <= 1) {
+      matchBadge.classList.add('hidden');
+      matchBadge.textContent = '';
+      if (matchList) {
+        matchList.classList.add('hidden');
+      }
+      isMatchListVisible = false;
+      return;
+    }
+    const remaining = matches.length - 1;
+    matchBadge.textContent = `${remaining} more match${remaining === 1 ? '' : 'es'}`;
+    matchBadge.classList.remove('hidden');
+  };
+
+  const renderMatchList = () => {
+    if (!matchList) {
+      return;
+    }
+    if (!matches || matches.length <= 1 || !isMatchListVisible) {
+      matchList.classList.add('hidden');
+      matchList.innerHTML = '';
+      return;
+    }
+
+    matchList.classList.remove('hidden');
+    matchList.innerHTML = '';
+    matches.forEach((match, index) => {
+      const item = document.createElement('li');
+      item.className = 'match-item';
+      if (index === selectedMatchIndex) {
+        item.classList.add('selected');
+      }
+
+      const label = document.createElement('span');
+      label.textContent = getMatchLabel(match);
+      item.appendChild(label);
+
+      item.addEventListener('click', () => {
+        if (index === selectedMatchIndex) {
+          return;
+        }
+        window.pathStructure?.selectMatchIndex(index);
+      });
+
+      matchList.appendChild(item);
+    });
   };
 
   window.pathStructure?.onStatus((status) => {
@@ -204,6 +375,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (addPathButton) {
     addPathButton.addEventListener('click', () => {
       window.pathStructure?.openAddPathWindow();
+    });
+  }
+
+  if (matchBadge) {
+    matchBadge.addEventListener('click', () => {
+      isMatchListVisible = !isMatchListVisible;
+      renderMatchList();
     });
   }
 

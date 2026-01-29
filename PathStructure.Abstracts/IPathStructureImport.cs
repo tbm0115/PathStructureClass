@@ -14,5 +14,10 @@ namespace PathStructure.Abstracts
         /// Gets the namespace for variables imported from the configuration.
         /// </summary>
         string Namespace { get; }
+
+        /// <summary>
+        /// Gets the root path to prepend to the imported configuration's top-level regex patterns.
+        /// </summary>
+        string RootPath { get; }
     }
 }

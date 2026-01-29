@@ -16,5 +16,10 @@ namespace PathStructure
         /// Gets or sets the namespace for variables imported from the configuration.
         /// </summary>
         public string Namespace { get; set; }
+
+        /// <summary>
+        /// Gets or sets the root path to prepend to the imported configuration's top-level regex patterns.
+        /// </summary>
+        public string RootPath { get; set; }
     }
 }

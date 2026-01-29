@@ -11,6 +11,7 @@ const watcherProcessName = 'PathStructure.WatcherHost.exe';
 let mainWindow;
 let addPathWindow;
 let importUrlWindow;
+let importManagerWindow;
 let tray;
 let watcherProcess;
 let reconnectTimer;
@@ -108,6 +109,35 @@ const createImportUrlWindow = () => {
   return importUrlWindow;
 };
 
+const createImportManagerWindow = () => {
+  if (importManagerWindow) {
+    importManagerWindow.focus();
+    return importManagerWindow;
+  }
+
+  importManagerWindow = new BrowserWindow({
+    width: 560,
+    height: 640,
+    resizable: true,
+    show: false,
+    parent: mainWindow ?? undefined,
+    modal: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'src', 'preload.js')
+    }
+  });
+
+  importManagerWindow.loadFile(path.join(__dirname, 'src', 'import-manager.html'));
+  importManagerWindow.once('ready-to-show', () => importManagerWindow.show());
+  importManagerWindow.on('closed', () => {
+    importManagerWindow = null;
+  });
+
+  return importManagerWindow;
+};
+
 const hideToTray = () => {
   if (!mainWindow) {
     return;
@@ -182,6 +212,12 @@ const createAppMenu = () => {
           label: 'Import Configuration URL...',
           click: () => {
             createImportUrlWindow();
+          }
+        },
+        {
+          label: 'Manage Imports...',
+          click: () => {
+            createImportManagerWindow();
           }
         }
       ]
@@ -322,13 +358,52 @@ const connectToWatcherHost = () => {
   rpcService.connect();
 };
 
-const sendImportRequest = async (params) => {
+const ensureRpcConnection = async () => {
   if (!rpcService) {
-    sendStatusUpdate({ connected: false, message: 'JSON-RPC service not available.' });
+    connectToWatcherHost();
+  }
+
+  if (!rpcService) {
+    throw new Error('JSON-RPC service not available.');
+  }
+
+  if (rpcService.isConnected()) {
     return;
   }
 
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timed out waiting for JSON-RPC connection.'));
+    }, 2000);
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      rpcService.removeListener('connected', handleConnected);
+      rpcService.removeListener('error', handleError);
+      rpcService.removeListener('disconnected', handleError);
+    };
+
+    const handleConnected = () => {
+      cleanup();
+      resolve();
+    };
+
+    const handleError = (error) => {
+      cleanup();
+      reject(error || new Error('Unable to connect to JSON-RPC service.'));
+    };
+
+    rpcService.on('connected', handleConnected);
+    rpcService.on('error', handleError);
+    rpcService.on('disconnected', handleError);
+    rpcService.connect();
+  });
+};
+
+const sendImportRequest = async (params) => {
   try {
+    await ensureRpcConnection();
     await rpcService.sendRequest('importPathStructure', params);
     sendStatusUpdate({ connected: true, message: 'Import added. Reloading configuration...' });
     rpcService.disconnect();
@@ -384,10 +459,7 @@ ipcMain.handle('show-window', () => {
 });
 
 ipcMain.handle('json-rpc-request', (_event, payload) => {
-  if (!rpcService) {
-    return Promise.reject(new Error('JSON-RPC service not available.'));
-  }
-  return rpcService.sendRequest(payload?.method, payload?.params);
+  return ensureRpcConnection().then(() => rpcService.sendRequest(payload?.method, payload?.params));
 });
 
 ipcMain.handle('scaffold-required-folders', async () => {
@@ -422,6 +494,23 @@ ipcMain.handle('soft-reset', () => {
 
 ipcMain.handle('open-add-path-window', () => {
   createAddPathWindow();
+});
+
+ipcMain.handle('open-import-manager-window', () => {
+  createImportManagerWindow();
+});
+
+ipcMain.handle('select-match-index', async (_event, index) => {
+  if (!pathStructureService) {
+    return;
+  }
+
+  const selectedIndex = Number(index);
+  if (Number.isNaN(selectedIndex)) {
+    return;
+  }
+
+  await pathStructureService.selectMatchIndex(selectedIndex);
 });
 
 ipcMain.handle('import-url', async (_event, url) => {
