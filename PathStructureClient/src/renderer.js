@@ -165,14 +165,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /*
       Label selection rules for the child structure name:
-      1) When there are multiple matches we want a concise label. Prefer `displayName` first.
-      2) If `displayName` is missing, fall back to `flavorText` (so the entry is not blank).
-      3) If both are missing but a pattern exists, show the pattern in a <code> tag.
-      4) When there is only a single match, only `displayName` is shown to keep labels consistent.
-      5) If we used `flavorText` as the label, suppress the separate flavor row below.
+      1) When there are multiple matches we want a concise label. Prefer the JSON `name` property first.
+      2) If `name` is missing, fall back to `displayName`.
+      3) If both are missing, fall back to `flavorText` (so the entry is not blank).
+      4) If all three are missing but a pattern exists, show the pattern in a <code> tag.
+      5) When there is only a single match, only `displayName` is shown to keep labels consistent.
+      6) If we used `flavorText` as the label, suppress the separate flavor row below.
     */
 
     if (hasMultipleMatches) {
+      if (child.name) {
+        return { label: child.name, isFlavorLabel: false, isPatternLabel: false };
+      }
       if (child.displayName) {
         return { label: child.displayName, isFlavorLabel: false, isPatternLabel: false };
       }
