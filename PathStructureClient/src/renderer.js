@@ -165,10 +165,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /*
       Label selection rules for the child structure name:
-      1) When there are multiple matches, only use the JSON `name` property to avoid showing filenames.
+      1) When there are multiple matches, prefer the JSON `name` property to avoid showing filenames.
       2) If `name` is missing, fall back to `flavorText` (so the entry is not blank).
       3) If both are missing but a pattern exists, show the pattern in a <code> tag.
-      4) When there is only a single match, only `displayName` is shown to keep labels consistent.
+      4) When there is only a single match, prefer the JSON `name` property, then `displayName`.
       5) If we used `flavorText` as the label, suppress the separate flavor row below.
     */
 
@@ -184,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    return { label: child.displayName || '', isFlavorLabel: false, isPatternLabel: false };
+    return { label: child.name || child.displayName || '', isFlavorLabel: false, isPatternLabel: false };
   };
 
   const renderChild = (child) => {
