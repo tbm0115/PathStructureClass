@@ -1,7 +1,16 @@
 const net = require('net');
 const { EventEmitter } = require('events');
 
+/**
+ * @typedef {import('../dtos/JsonRpcNotification').JsonRpcNotification<unknown>} JsonRpcNotification
+ * @typedef {import('../dtos/JsonRpcResponse').JsonRpcResponse<unknown>} JsonRpcResponse
+ * @typedef {import('../dtos/JsonRpcErrorResponse').JsonRpcErrorResponse} JsonRpcErrorResponse
+ */
+
 class JsonRpcService extends EventEmitter {
+  /**
+   * @param {{ host: string, port: number }} options
+   */
   constructor({ host, port }) {
     super();
     this.host = host;
@@ -40,6 +49,11 @@ class JsonRpcService extends EventEmitter {
     this.rejectPending(new Error('Disconnected from JSON-RPC host.'));
   }
 
+  /**
+   * @param {string} method
+   * @param {Record<string, unknown>} params
+   * @returns {Promise<unknown>}
+   */
   sendRequest(method, params) {
     const id = String(this.nextId++);
     const payload = {
@@ -60,6 +74,9 @@ class JsonRpcService extends EventEmitter {
     });
   }
 
+  /**
+   * @param {Buffer} chunk
+   */
   handleChunk(chunk) {
     this.buffer += chunk.toString();
     const lines = this.buffer.split('\n');
@@ -78,6 +95,9 @@ class JsonRpcService extends EventEmitter {
     }
   }
 
+  /**
+   * @param {JsonRpcNotification|JsonRpcResponse|JsonRpcErrorResponse} payload
+   */
   handlePayload(payload) {
     if (payload?.method) {
       this.emit('notification', payload);

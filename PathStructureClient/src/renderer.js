@@ -1,3 +1,22 @@
+/**
+ * @typedef {object} ChildStructureState
+ * @property {string} name
+ * @property {string} displayPath
+ * @property {string|null} literalPath
+ * @property {string} flavorText
+ * @property {string} pattern
+ * @property {boolean} isRequired
+ * @property {string|null} icon
+ * @property {string|null} backgroundColor
+ * @property {string|null} foregroundColor
+ * @property {string[]} matchingPaths
+ * @property {string|null} trackedFolder
+ * @property {boolean} exists
+ * @property {boolean} isFile
+ * @property {Array<{severity: 'warning'|'error'|'fatal', message: string}>} exceptions
+ * @property {'warning'|'error'|'fatal'|null} severity
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
   if (window.pathStructure?.platform) {
     document.body.dataset.platform = window.pathStructure.platform;
@@ -50,6 +69,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  /**
+   * @param {Array<{severity: 'warning'|'error'|'fatal'}>} exceptions
+   * @returns {'warning'|'error'|'fatal'|null}
+   */
   const getMaxSeverity = (exceptions) => {
     if (!exceptions || exceptions.length === 0) {
       return null;
@@ -83,6 +106,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return field;
   };
 
+  /**
+   * @param {{ matchList: HTMLElement, matchingPaths: string[], trackedFolder: string|null }} params
+   * @returns {(() => void)|null}
+   */
   const getChildMatchListRenderer = ({ matchList, matchingPaths, trackedFolder }) => {
     if (!matchList) {
       return null;
@@ -160,33 +187,37 @@ document.addEventListener('DOMContentLoaded', () => {
     return renderMatchList;
   };
 
+  /**
+   * @param {ChildStructureState} child
+   * @returns {{ label: string, isFlavorLabel: boolean, isPatternLabel: boolean }}
+   */
   const getChildLabelDetails = (child) => {
     const hasMultipleMatches = Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1;
 
     /*
       Label selection rules for the child structure name:
-      1) When there are multiple matches, prefer the JSON `name` property to avoid showing filenames.
+      1) Prefer the JSON `name` property for both single and multiple matches.
       2) If `name` is missing, fall back to `flavorText` (so the entry is not blank).
       3) If both are missing but a pattern exists, show the pattern in a <code> tag.
-      4) When there is only a single match, prefer the JSON `name` property, then `displayName`.
-      5) If we used `flavorText` as the label, suppress the separate flavor row below.
+      4) If we used `flavorText` as the label, suppress the separate flavor row below.
     */
 
-    if (hasMultipleMatches) {
-      if (child.name) {
-        return { label: child.name, isFlavorLabel: false, isPatternLabel: false };
-      }
-      if (child.flavorText) {
-        return { label: child.flavorText, isFlavorLabel: true, isPatternLabel: false };
-      }
-      if (child.pattern) {
-        return { label: child.pattern, isFlavorLabel: false, isPatternLabel: true };
-      }
+    if (child.name) {
+      return { label: child.name, isFlavorLabel: false, isPatternLabel: false };
+    }
+    if (child.flavorText) {
+      return { label: child.flavorText, isFlavorLabel: true, isPatternLabel: false };
+    }
+    if (child.pattern) {
+      return { label: child.pattern, isFlavorLabel: false, isPatternLabel: true };
     }
 
-    return { label: child.name || child.displayName || '', isFlavorLabel: false, isPatternLabel: false };
+    return { label: '', isFlavorLabel: false, isPatternLabel: false };
   };
 
+  /**
+   * @param {ChildStructureState} child
+   */
   const renderChild = (child) => {
     const item = getTemplateElement(childItemTemplate);
     if (!item) {
@@ -278,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return (
         child.literalPath?.toLowerCase().includes(query) ||
         matchPaths.toLowerCase().includes(query) ||
-        child.displayName?.toLowerCase().includes(query) ||
+        child.name?.toLowerCase().includes(query) ||
         child.flavorText?.toLowerCase().includes(query)
       );
     });
@@ -352,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!match) {
       return '';
     }
-    return match.matchedValue || match.MatchedValue || match.pattern || match.Pattern || match.nodeName || match.NodeName || '';
+    return match.name || match.matchedValue || match.pattern || '';
   };
 
   const renderMatchBadge = () => {

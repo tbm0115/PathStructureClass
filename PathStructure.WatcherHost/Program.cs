@@ -12,6 +12,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using PathStructure;
 using PathStructure.Abstracts;
+using PathStructure.WatcherHost.Dtos;
 
 namespace PathStructure.WatcherHost
 {
@@ -113,29 +114,27 @@ namespace PathStructure.WatcherHost
             _watcher.ExplorerWatcherFound += OnExplorerFound;
             _watcher.ExplorerWatcherError += (sender, exception) =>
             {
-                BroadcastNotification(new
+                BroadcastNotification(new JsonRpcNotification<WatcherErrorNotificationParams>
                 {
-                    jsonrpc = "2.0",
-                    method = "watcherError",
-                    @params = new
+                    Method = "watcherError",
+                    Params = new WatcherErrorNotificationParams
                     {
-                        message = "Explorer watcher error.",
-                        error = exception?.Message,
-                        timestamp = DateTimeOffset.Now.ToString("o")
+                        Message = "Explorer watcher error.",
+                        Error = exception?.Message,
+                        Timestamp = DateTimeOffset.Now.ToString("o")
                     }
                 });
             };
             _watcher.ExplorerWatcherAborted += (sender, exceptionArgs) =>
             {
-                BroadcastNotification(new
+                BroadcastNotification(new JsonRpcNotification<WatcherAbortedNotificationParams>
                 {
-                    jsonrpc = "2.0",
-                    method = "watcherAborted",
-                    @params = new
+                    Method = "watcherAborted",
+                    Params = new WatcherAbortedNotificationParams
                     {
-                        message = "Explorer watcher aborted.",
-                        error = exceptionArgs?.ToString(),
-                        timestamp = DateTimeOffset.Now.ToString("o")
+                        Message = "Explorer watcher aborted.",
+                        Error = exceptionArgs?.ToString(),
+                        Timestamp = DateTimeOffset.Now.ToString("o")
                     }
                 });
             };
@@ -168,15 +167,14 @@ namespace PathStructure.WatcherHost
                 Clients.TryAdd(client, stream);
                 Console.WriteLine("Client connected.");
 
-                var statusPayload = new
+                var statusPayload = new JsonRpcNotification<StatusNotificationParams>
                 {
-                    jsonrpc = "2.0",
-                    method = "status",
-                    @params = new
+                    Method = "status",
+                    Params = new StatusNotificationParams
                     {
-                        message = "Client connected.",
-                        state = "connected",
-                        timestamp = DateTimeOffset.Now.ToString("o")
+                        Message = "Client connected.",
+                        State = "connected",
+                        Timestamp = DateTimeOffset.Now.ToString("o")
                     }
                 };
                 await SendAsync(stream, SerializeJson(statusPayload)).ConfigureAwait(false);
@@ -240,71 +238,51 @@ namespace PathStructure.WatcherHost
                 ? FindImmediateChildMatches(new[] { currentMatch })
                 : FindImmediateChildMatches(url, matchSummary);
             var matchesPayload = hasMatches
-                ? matches.Select(match => new
+                ? matches.Select(match =>
                 {
-                    match.NodeName,
-                    match.Pattern,
-                    match.MatchedValue,
-                    match.MatchLength,
-                    match.FlavorTextTemplate,
-                    match.BackgroundColor,
-                    match.ForegroundColor,
-                    match.Icon,
-                    isRequired = match.IsRequired,
-                    childMatches = FindImmediateChildMatches(new[] { match }).Select(child => new
-                    {
-                        child.NodeName,
-                        child.Pattern,
-                        child.MatchedValue,
-                        child.MatchLength,
-                        child.FlavorTextTemplate,
-                        child.BackgroundColor,
-                        child.ForegroundColor,
-                        child.Icon,
-                        isRequired = child.IsRequired
-                    }).ToArray()
-                }).ToArray()
-                : Array.Empty<object>();
+                    var dto = BuildPathMatchDto(match);
+                    dto.ChildMatches = FindImmediateChildMatches(new[] { match })
+                        .Select(BuildPathMatchDto)
+                        .ToList();
+                    return dto;
+                }).ToList()
+                : new List<PathMatchDto>();
 #if DEBUG
             LogMatches(url, matchSummary);
 #endif
-            BroadcastNotification(new
+            BroadcastNotification(new JsonRpcNotification<PathChangedNotificationParams>
             {
-                jsonrpc = "2.0",
-                method = "pathChanged",
-                @params = new
+                Method = "pathChanged",
+                Params = new PathChangedNotificationParams
                 {
-                    message = "Explorer path changed.",
-                    path = url,
-                    currentMatch = hasMatches ? new
-                    {
-                        currentMatch.NodeName,
-                        currentMatch.Pattern,
-                        currentMatch.MatchedValue,
-                        currentMatch.MatchLength,
-                        currentMatch.FlavorTextTemplate,
-                        currentMatch.BackgroundColor,
-                        currentMatch.ForegroundColor,
-                        currentMatch.Icon,
-                        isRequired = currentMatch.IsRequired
-                    } : null,
-                    variables = variables,
-                    matches = matchesPayload,
-                    immediateChildMatches = childMatches.Select(match => new
-                    {
-                        match.NodeName,
-                        match.Pattern,
-                        match.MatchedValue,
-                        match.MatchLength,
-                        match.FlavorTextTemplate,
-                        match.BackgroundColor,
-                        match.ForegroundColor,
-                        match.Icon,
-                        isRequired = match.IsRequired
-                    }).ToArray(),
-                    timestamp = DateTimeOffset.Now.ToString("o")
+                    Message = "Explorer path changed.",
+                    Path = url,
+                    CurrentMatch = hasMatches ? BuildPathMatchDto(currentMatch) : null,
+                    Variables = variables,
+                    Matches = matchesPayload,
+                    ImmediateChildMatches = childMatches.Select(BuildPathMatchDto).ToList(),
+                    Timestamp = DateTimeOffset.Now.ToString("o")
                 }
             });
+        }
+
+        /// <summary>
+        /// Builds a DTO for JSON-RPC payloads from a path pattern match.
+        /// </summary>
+        private static PathMatchDto BuildPathMatchDto(PathPatternMatch match)
+        {
+            return new PathMatchDto
+            {
+                Name = match.NodeName,
+                Pattern = match.Pattern,
+                MatchedValue = match.MatchedValue,
+                MatchLength = match.MatchLength,
+                FlavorTextTemplate = match.FlavorTextTemplate,
+                BackgroundColor = match.BackgroundColor,
+                ForegroundColor = match.ForegroundColor,
+                Icon = match.Icon,
+                IsRequired = match.IsRequired
+            };
         }
 
         /// <summary>
@@ -1228,11 +1206,10 @@ namespace PathStructure.WatcherHost
         /// </summary>
         private static Task SendJsonRpcResultAsync(NetworkStream stream, string id, object result)
         {
-            var payload = new
+            var payload = new JsonRpcResponse<object>
             {
-                jsonrpc = "2.0",
-                id,
-                result
+                Id = id,
+                Result = result
             };
             return SendAsync(stream, SerializeJson(payload));
         }
@@ -1242,15 +1219,14 @@ namespace PathStructure.WatcherHost
         /// </summary>
         private static Task SendJsonRpcErrorAsync(NetworkStream stream, string id, int code, string message, object data)
         {
-            var payload = new
+            var payload = new JsonRpcErrorResponse
             {
-                jsonrpc = "2.0",
-                id,
-                error = new
+                Id = id,
+                Error = new JsonRpcErrorDetails
                 {
-                    code,
-                    message,
-                    data
+                    Code = code,
+                    Message = message,
+                    Data = data
                 }
             };
             return SendAsync(stream, SerializeJson(payload));

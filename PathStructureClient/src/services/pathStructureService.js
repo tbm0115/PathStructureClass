@@ -2,6 +2,50 @@ const { EventEmitter } = require('events');
 const fs = require('fs');
 const path = require('path');
 
+/**
+ * @typedef {import('../dtos/PathMatchDto').PathMatchDto} PathMatchDto
+ * @typedef {import('../dtos/PathChangedNotificationParams').PathChangedNotificationParams} PathChangedNotificationParams
+ */
+
+/**
+ * @typedef {object} DirectoryEntry
+ * @property {string} name
+ * @property {string} fullPath
+ * @property {boolean} isDirectory
+ * @property {boolean} isFile
+ */
+
+/**
+ * @typedef {object} DirectoryEntries
+ * @property {DirectoryEntry[]} entries
+ * @property {string|null} error
+ */
+
+/**
+ * @typedef {object} ChildValidationException
+ * @property {'warning'|'error'|'fatal'} severity
+ * @property {string} message
+ */
+
+/**
+ * @typedef {object} ChildStructureState
+ * @property {string} name
+ * @property {string} displayPath
+ * @property {string|null} literalPath
+ * @property {string} flavorText
+ * @property {string} pattern
+ * @property {boolean} isRequired
+ * @property {string|null} icon
+ * @property {string|null} backgroundColor
+ * @property {string|null} foregroundColor
+ * @property {string[]} matchingPaths
+ * @property {string|null} trackedFolder
+ * @property {boolean} exists
+ * @property {boolean} isFile
+ * @property {ChildValidationException[]} exceptions
+ * @property {'warning'|'error'|'fatal'|null} severity
+ */
+
 const severityOrder = {
   warning: 1,
   error: 2,
@@ -106,6 +150,9 @@ const looksLikeFilePattern = (pattern) => {
 };
 
 class PathStructureService extends EventEmitter {
+  /**
+   * @param {{ rpcService: import('./jsonRpcService').JsonRpcService }} options
+   */
   constructor({ rpcService }) {
     super();
     this.rpcService = rpcService;
@@ -121,6 +168,9 @@ class PathStructureService extends EventEmitter {
     };
   }
 
+  /**
+   * @param {import('../dtos/JsonRpcNotification').JsonRpcNotification<unknown>} payload
+   */
   async handleNotification(payload) {
     if (!payload?.method) {
       return;
@@ -155,10 +205,19 @@ class PathStructureService extends EventEmitter {
     }
   }
 
+  /**
+   * @param {PathChangedNotificationParams} params
+   */
   async handlePathChanged(params) {
-    this.state.trackedPath = params?.path || null;
-    this.state.variables = params?.variables || {};
-    const matches = Array.isArray(params?.matches) ? params.matches : [];
+    /** @type {PathChangedNotificationParams|undefined|null} */
+    const pathChanged = params;
+    if (!pathChanged) {
+      return;
+    }
+
+    this.state.trackedPath = pathChanged.path || null;
+    this.state.variables = pathChanged.variables || {};
+    const matches = Array.isArray(pathChanged.matches) ? pathChanged.matches : [];
     if (matches.length > 0) {
       this.state.matches = matches;
       this.state.selectedMatchIndex = 0;
@@ -168,17 +227,16 @@ class PathStructureService extends EventEmitter {
     } else {
       this.state.matches = [];
       this.state.selectedMatchIndex = 0;
-      this.state.currentMatch = params?.currentMatch || null;
-      const immediateChildren =
-        params?.immediateChildMatches ||
-        params?.ImmediateChildMatches ||
-        params?.immediateChildren ||
-        params?.children;
+      this.state.currentMatch = pathChanged.currentMatch || null;
+      const immediateChildren = pathChanged.immediateChildMatches || [];
       this.state.rawChildren = Array.isArray(immediateChildren) ? immediateChildren : [];
     }
     await this.refreshValidation();
   }
 
+  /**
+   * @returns {Promise<void>}
+   */
   async refreshValidation() {
     const basePath = this.state.currentMatch?.matchedValue || this.state.trackedPath;
     const trackedFolder = await this.resolveTrackedFolder(basePath);
@@ -192,7 +250,7 @@ class PathStructureService extends EventEmitter {
     this.state.children = children;
     this.emit('update', {
       trackedPath: this.state.trackedPath,
-      trackedName: this.state.currentMatch?.nodeName,
+      trackedName: this.state.currentMatch?.name || null,
       trackedFolder: this.state.trackedFolder,
       currentFlavorText: this.buildCurrentFlavorText(),
       matches: this.state.matches,
@@ -201,6 +259,10 @@ class PathStructureService extends EventEmitter {
     });
   }
 
+  /**
+   * @param {number} index
+   * @returns {Promise<void>}
+   */
   async selectMatchIndex(index) {
     if (!Array.isArray(this.state.matches) || this.state.matches.length === 0) {
       return;
@@ -217,14 +279,17 @@ class PathStructureService extends EventEmitter {
     await this.refreshValidation();
   }
 
+  /**
+   * @returns {string}
+   */
   buildCurrentFlavorText() {
-    const template =
-      this.state.currentMatch?.FlavorTextTemplate ||
-      this.state.currentMatch?.flavorTextTemplate ||
-      '';
+    const template = this.state.currentMatch?.flavorTextTemplate || '';
     return renderTemplateWithVariables(template, this.state.variables);
   }
 
+  /**
+   * @returns {Promise<{ created: string[], skipped: string[], message: string }>}
+   */
   async scaffoldRequiredFolders() {
     const created = [];
     const skipped = [];
@@ -235,13 +300,13 @@ class PathStructureService extends EventEmitter {
 
     for (const child of this.state.children) {
       if (!child.isRequired || child.exists || child.isFile) {
-        skipped.push(child.displayName);
+        skipped.push(child.name);
         continue;
       }
 
-      const folderPath = path.join(this.state.trackedFolder, sanitizeName(child.displayName));
+      const folderPath = path.join(this.state.trackedFolder, sanitizeName(child.name));
       if (fs.existsSync(folderPath)) {
-        skipped.push(child.displayName);
+        skipped.push(child.name);
         continue;
       }
 
@@ -249,7 +314,7 @@ class PathStructureService extends EventEmitter {
         fs.mkdirSync(folderPath, { recursive: true });
         created.push(folderPath);
       } catch (error) {
-        skipped.push(child.displayName);
+        skipped.push(child.name);
       }
     }
 
@@ -262,6 +327,10 @@ class PathStructureService extends EventEmitter {
     return { created, skipped, message };
   }
 
+  /**
+   * @param {string|null} trackedPath
+   * @returns {Promise<string|null>}
+   */
   async resolveTrackedFolder(trackedPath) {
     if (!trackedPath) {
       return null;
@@ -280,6 +349,10 @@ class PathStructureService extends EventEmitter {
     return trackedPath;
   }
 
+  /**
+   * @param {string|null} trackedFolder
+   * @returns {Promise<DirectoryEntries>}
+   */
   async readDirectoryEntries(trackedFolder) {
     if (!trackedFolder) {
       return { entries: [], error: 'No tracked folder available.' };
@@ -301,15 +374,23 @@ class PathStructureService extends EventEmitter {
     }
   }
 
+  /**
+   * @param {PathMatchDto} child
+   * @param {DirectoryEntries} entryInfo
+   * @param {string|null} trackedFolder
+   * @param {string|null} trackedPath
+   * @param {Record<string, string>} variables
+   * @returns {ChildStructureState}
+   */
   buildChildState(child, entryInfo, trackedFolder, trackedPath, variables) {
-    const nodeName = child?.NodeName || child?.nodeName || child?.name;
-    const pattern = child?.Pattern || child?.pattern || '';
-    const flavorTextTemplate = child?.FlavorTextTemplate || child?.flavorTextTemplate || '';
-    const isRequired = Boolean(child?.isRequired ?? child?.IsRequired);
-    const matchedValue = child?.MatchedValue || child?.matchedValue || '';
-    const icon = child?.Icon || child?.icon || null;
-    const backgroundColor = child?.BackgroundColor || child?.backgroundColor || null;
-    const foregroundColor = child?.ForegroundColor || child?.foregroundColor || null;
+    const name = child?.name || '';
+    const pattern = child?.pattern || '';
+    const flavorTextTemplate = child?.flavorTextTemplate || '';
+    const isRequired = Boolean(child?.isRequired);
+    const matchedValue = child?.matchedValue || '';
+    const icon = child?.icon ?? null;
+    const backgroundColor = child?.backgroundColor ?? null;
+    const foregroundColor = child?.foregroundColor ?? null;
 
     const exceptions = [];
 
@@ -384,24 +465,24 @@ class PathStructureService extends EventEmitter {
       exceptions.push({ severity: 'error', message: 'Required path not found in tracked folder.' });
     }
 
-    const displayName = matchedEntry?.name || nodeName || sanitizeName(pattern);
-    let displayPath = displayName;
+    const resolvedName = name || sanitizeName(pattern);
+    let displayPath = matchedEntry?.name || resolvedName;
     if (matchedEntry?.fullPath && trackedFolder) {
       const relativePath = path.relative(trackedFolder, matchedEntry.fullPath);
       displayPath = relativePath.startsWith('..') ? matchedEntry.fullPath : relativePath;
     }
     const literalPath =
       matchedEntry?.fullPath ||
-      (trackedFolder && displayName ? path.join(trackedFolder, displayName) : null) ||
+      (trackedFolder && displayPath ? path.join(trackedFolder, displayPath) : null) ||
       pattern ||
-      displayName;
+      displayPath;
     const templateMatch = matchedEntryResult || fallbackMatch || lineageMatch;
     const flavorText = templateMatch?.groups
       ? renderTemplate(flavorTextTemplate, templateMatch)
       : renderTemplateWithVariables(flavorTextTemplate, variables);
 
     return {
-      displayName,
+      name: resolvedName,
       displayPath,
       literalPath,
       flavorText,
