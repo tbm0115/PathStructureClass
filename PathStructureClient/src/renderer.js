@@ -193,7 +193,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    setFieldText(item, 'displayPath', child.displayPath || child.literalPath || '');
+    const hasMultipleMatches = Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1;
+    const displayPathField = setFieldText(item, 'displayPath', child.displayPath || child.literalPath || '');
+    if (displayPathField) {
+      displayPathField.hidden = hasMultipleMatches;
+    }
 
     const requiredBadge = getField(item, 'requiredBadge');
     if (requiredBadge) {
@@ -215,7 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const matchList = getField(item, 'matchList');
     const matchCountBadge = getField(item, 'matchCountBadge');
-    const hasMultipleMatches = Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1;
 
     if (matchCountBadge) {
       matchCountBadge.hidden = !hasMultipleMatches;
