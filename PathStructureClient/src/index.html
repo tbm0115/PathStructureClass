@@ -53,6 +53,21 @@
         <button id="toggle-service" class="ghost-button" type="button">Start service</button>
       </footer>
     </main>
+    <template id="child-item-template">
+      <li class="path-item" data-child-item>
+        <div class="path-item-header">
+          <span class="path-item-label" data-field="displayPath"></span>
+          <span class="required-badge" data-field="requiredBadge" hidden>Required</span>
+          <span class="validation-icon" data-field="severityIcon" hidden></span>
+          <button class="match-count-badge" data-field="matchCountBadge" type="button" hidden></button>
+        </div>
+        <div class="path-item-main">
+          <strong class="path-name" data-field="displayName"></strong>
+        </div>
+        <div class="path-flavor" data-field="flavorText" hidden></div>
+        <div class="child-match-list hidden" data-field="matchList"></div>
+      </li>
+    </template>
     <script src="renderer.js"></script>
   </body>
 </html>
