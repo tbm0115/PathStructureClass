@@ -9,6 +9,10 @@
   <body>
     <main>
       <section class="tracked-panel">
+        <div id="tracked-folder-group">
+          <p class="label">Tracked folder</p>
+          <p id="tracked-folder" class="value">Awaiting Explorer selection.</p>
+        </div>
         <div>
           <p id="tracked-path" class="value">No path selected.</p>
           <p class="value"><strong id="tracked-name"></strong></p>
@@ -18,16 +22,12 @@
           </div>
           <p id="tracked-flavor" class="path-flavor muted" hidden></p>
         </div>
-        <div id="tracked-folder-group">
-          <p class="label">Tracked folder</p>
-          <p id="tracked-folder" class="value">Awaiting Explorer selection.</p>
-        </div>
       </section>
 
       <section class="child-panel" id="child-panel">
         <div class="child-panel-header">
           <div>
-            <h2>Child structures</h2>
+            <h2>Tracked Files/Folders</h2>
             <p class="subtitle">Items expected directly beneath the tracked folder.</p>
           </div>
           <span id="child-count" class="count-pill">0 items</span>
@@ -53,6 +53,21 @@
         <button id="toggle-service" class="ghost-button" type="button">Start service</button>
       </footer>
     </main>
+    <template id="child-item-template">
+      <li class="path-item" data-child-item>
+        <div class="path-item-header">
+          <span class="path-item-label" data-field="displayPath"></span>
+          <span class="required-badge" data-field="requiredBadge" hidden>Required</span>
+          <span class="validation-icon" data-field="severityIcon" hidden></span>
+          <button class="match-count-badge" data-field="matchCountBadge" type="button" hidden></button>
+        </div>
+        <div class="path-item-main">
+          <strong class="path-name" data-field="displayName"></strong>
+        </div>
+        <div class="path-flavor" data-field="flavorText" hidden></div>
+        <div class="child-match-list hidden" data-field="matchList"></div>
+      </li>
+    </template>
     <script src="renderer.js"></script>
   </body>
 </html>

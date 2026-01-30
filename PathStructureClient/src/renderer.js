@@ -1,3 +1,22 @@
+/**
+ * @typedef {object} ChildStructureState
+ * @property {string} name
+ * @property {string} displayPath
+ * @property {string|null} literalPath
+ * @property {string} flavorText
+ * @property {string} pattern
+ * @property {boolean} isRequired
+ * @property {string|null} icon
+ * @property {string|null} backgroundColor
+ * @property {string|null} foregroundColor
+ * @property {string[]} matchingPaths
+ * @property {string|null} trackedFolder
+ * @property {boolean} exists
+ * @property {boolean} isFile
+ * @property {Array<{severity: 'warning'|'error'|'fatal', message: string}>} exceptions
+ * @property {'warning'|'error'|'fatal'|null} severity
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
   if (window.pathStructure?.platform) {
     document.body.dataset.platform = window.pathStructure.platform;
@@ -19,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('child-search');
   const addPathButton = document.getElementById('add-path');
   const toggleServiceButton = document.getElementById('toggle-service');
+  const childItemTemplate = document.getElementById('child-item-template');
 
   let allChildren = [];
   let currentSearch = '';
@@ -49,6 +69,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  /**
+   * @param {Array<{severity: 'warning'|'error'|'fatal'}>} exceptions
+   * @returns {'warning'|'error'|'fatal'|null}
+   */
   const getMaxSeverity = (exceptions) => {
     if (!exceptions || exceptions.length === 0) {
       return null;
@@ -61,153 +85,210 @@ document.addEventListener('DOMContentLoaded', () => {
     }, null);
   };
 
+  const getTemplateElement = (template) => {
+    if (!template || !(template instanceof HTMLTemplateElement)) {
+      return null;
+    }
+    return template.content.firstElementChild?.cloneNode(true) || null;
+  };
+
+  const getField = (root, fieldName) => root.querySelector(`[data-field="${fieldName}"]`);
+
+  const setFieldText = (root, fieldName, value, options = {}) => {
+    const field = getField(root, fieldName);
+    if (!field) {
+      return null;
+    }
+    field.textContent = value;
+    if (options.hideWhenEmpty) {
+      field.hidden = !value;
+    }
+    return field;
+  };
+
+  /**
+   * @param {{ matchList: HTMLElement, matchingPaths: string[], trackedFolder: string|null }} params
+   * @returns {(() => void)|null}
+   */
+  const getChildMatchListRenderer = ({ matchList, matchingPaths, trackedFolder }) => {
+    if (!matchList) {
+      return null;
+    }
+
+    const trimTrackedFolder = (value) => {
+      if (!value || !trackedFolder) {
+        return value || '';
+      }
+      const normalizedFolder = trackedFolder.endsWith('\\') || trackedFolder.endsWith('/')
+        ? trackedFolder
+        : `${trackedFolder}${value.includes('/') ? '/' : '\\'}`;
+      return value.startsWith(normalizedFolder) ? value.slice(normalizedFolder.length) : value;
+    };
+
+    const pageSize = 5;
+    let page = 0;
+
+    const renderMatchList = () => {
+      matchList.innerHTML = '';
+      const start = page * pageSize;
+      const end = start + pageSize;
+      const slice = matchingPaths.slice(start, end);
+
+      const list = document.createElement('ul');
+      list.className = 'child-match-paths';
+
+      slice.forEach((matchPath) => {
+        const listItem = document.createElement('li');
+        listItem.textContent = trimTrackedFolder(matchPath);
+        list.appendChild(listItem);
+      });
+
+      matchList.appendChild(list);
+
+      if (matchingPaths.length > pageSize) {
+        const controls = document.createElement('div');
+        controls.className = 'child-match-controls';
+
+        const prev = document.createElement('button');
+        prev.type = 'button';
+        prev.className = 'ghost-button';
+        prev.textContent = 'Prev';
+        prev.disabled = page === 0;
+        prev.addEventListener('click', () => {
+          if (page > 0) {
+            page -= 1;
+            renderMatchList();
+          }
+        });
+
+        const next = document.createElement('button');
+        next.type = 'button';
+        next.className = 'ghost-button';
+        next.textContent = 'Next';
+        next.disabled = end >= matchingPaths.length;
+        next.addEventListener('click', () => {
+          if (end < matchingPaths.length) {
+            page += 1;
+            renderMatchList();
+          }
+        });
+
+        const count = document.createElement('span');
+        count.className = 'child-match-count';
+        count.textContent = `${start + 1}-${Math.min(end, matchingPaths.length)} of ${matchingPaths.length}`;
+
+        controls.appendChild(prev);
+        controls.appendChild(count);
+        controls.appendChild(next);
+        matchList.appendChild(controls);
+      }
+    };
+
+    return renderMatchList;
+  };
+
+  /**
+   * @param {ChildStructureState} child
+   * @returns {{ label: string, isFlavorLabel: boolean, isPatternLabel: boolean }}
+   */
+  const getChildLabelDetails = (child) => {
+    const hasMultipleMatches = Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1;
+
+    /*
+      Label selection rules for the child structure name:
+      1) Prefer the JSON `name` property for both single and multiple matches.
+      2) If `name` is missing, fall back to `flavorText` (so the entry is not blank).
+      3) If both are missing but a pattern exists, show the pattern in a <code> tag.
+      4) If we used `flavorText` as the label, suppress the separate flavor row below.
+    */
+
+    if (child.name) {
+      return { label: child.name, isFlavorLabel: false, isPatternLabel: false };
+    }
+    if (child.flavorText) {
+      return { label: child.flavorText, isFlavorLabel: true, isPatternLabel: false };
+    }
+    if (child.pattern) {
+      return { label: child.pattern, isFlavorLabel: false, isPatternLabel: true };
+    }
+
+    return { label: '', isFlavorLabel: false, isPatternLabel: false };
+  };
+
+  /**
+   * @param {ChildStructureState} child
+   */
   const renderChild = (child) => {
-    const item = document.createElement('li');
-    item.className = 'path-item';
+    const item = getTemplateElement(childItemTemplate);
+    if (!item) {
+      return;
+    }
 
-    const pathRow = document.createElement('div');
-    pathRow.className = 'path-item-header';
+    const hasMultipleMatches = Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1;
+    const displayPathField = setFieldText(item, 'displayPath', child.displayPath || child.literalPath || '');
+    if (displayPathField) {
+      displayPathField.hidden = hasMultipleMatches;
+    }
 
-    const pathLabel = document.createElement('span');
-    pathLabel.className = 'path-item-label';
-    pathLabel.textContent = child.displayPath || child.literalPath || '';
-    pathRow.appendChild(pathLabel);
-
-    if (child.isRequired) {
-      const badge = document.createElement('span');
-      badge.className = 'required-badge';
-      badge.textContent = 'Required';
-      pathRow.appendChild(badge);
+    const requiredBadge = getField(item, 'requiredBadge');
+    if (requiredBadge) {
+      requiredBadge.hidden = !child.isRequired;
     }
 
     const severity = getMaxSeverity(child.exceptions);
-    if (severity) {
-      const icon = document.createElement('span');
-      icon.className = `validation-icon severity-${severity}`;
-      icon.textContent = '●';
-      icon.title = child.exceptions.map((exception) => exception.message).join('\n');
-      pathRow.appendChild(icon);
+    const severityIcon = getField(item, 'severityIcon');
+    if (severityIcon) {
+      if (severity) {
+        severityIcon.className = `validation-icon severity-${severity}`;
+        severityIcon.textContent = '●';
+        severityIcon.title = child.exceptions.map((exception) => exception.message).join('\n');
+        severityIcon.hidden = false;
+      } else {
+        severityIcon.hidden = true;
+      }
     }
 
-    if (Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1) {
-      const trimTrackedFolder = (value) => {
-        if (!value || !child.trackedFolder) {
-          return value || '';
-        }
-        const normalizedFolder = child.trackedFolder.endsWith('\\') || child.trackedFolder.endsWith('/')
-          ? child.trackedFolder
-          : `${child.trackedFolder}${value.includes('/') ? '/' : '\\'}`;
-        return value.startsWith(normalizedFolder) ? value.slice(normalizedFolder.length) : value;
-      };
+    const matchList = getField(item, 'matchList');
+    const matchCountBadge = getField(item, 'matchCountBadge');
 
-      const badge = document.createElement('button');
-      badge.type = 'button';
-      badge.className = 'match-count-badge';
-      badge.textContent = `+${child.matchingPaths.length - 1}`;
-      pathRow.appendChild(badge);
+    if (matchCountBadge) {
+      matchCountBadge.hidden = !hasMultipleMatches;
+    }
 
-      const matchList = document.createElement('div');
-      matchList.className = 'child-match-list hidden';
-      item.appendChild(matchList);
+    if (hasMultipleMatches && matchCountBadge && matchList) {
+      matchCountBadge.textContent = `+${child.matchingPaths.length - 1}`;
+      const renderMatchList = getChildMatchListRenderer({
+        matchList,
+        matchingPaths: child.matchingPaths,
+        trackedFolder: child.trackedFolder
+      });
 
-      const pageSize = 5;
-      let page = 0;
-
-      const renderMatchList = () => {
-        matchList.innerHTML = '';
-        const start = page * pageSize;
-        const end = start + pageSize;
-        const slice = child.matchingPaths.slice(start, end);
-
-        const list = document.createElement('ul');
-        list.className = 'child-match-paths';
-
-        slice.forEach((matchPath) => {
-          const listItem = document.createElement('li');
-          listItem.textContent = trimTrackedFolder(matchPath);
-          list.appendChild(listItem);
-        });
-
-        matchList.appendChild(list);
-
-        if (child.matchingPaths.length > pageSize) {
-          const controls = document.createElement('div');
-          controls.className = 'child-match-controls';
-
-          const prev = document.createElement('button');
-          prev.type = 'button';
-          prev.className = 'ghost-button';
-          prev.textContent = 'Prev';
-          prev.disabled = page === 0;
-          prev.addEventListener('click', () => {
-            if (page > 0) {
-              page -= 1;
-              renderMatchList();
-            }
-          });
-
-          const next = document.createElement('button');
-          next.type = 'button';
-          next.className = 'ghost-button';
-          next.textContent = 'Next';
-          next.disabled = end >= child.matchingPaths.length;
-          next.addEventListener('click', () => {
-            if (end < child.matchingPaths.length) {
-              page += 1;
-              renderMatchList();
-            }
-          });
-
-          const count = document.createElement('span');
-          count.className = 'child-match-count';
-          count.textContent = `${start + 1}-${Math.min(end, child.matchingPaths.length)} of ${child.matchingPaths.length}`;
-
-          controls.appendChild(prev);
-          controls.appendChild(count);
-          controls.appendChild(next);
-          matchList.appendChild(controls);
-        }
-      };
-
-      badge.addEventListener('click', () => {
+      matchCountBadge.addEventListener('click', () => {
         matchList.classList.toggle('hidden');
-        if (!matchList.classList.contains('hidden')) {
+        if (!matchList.classList.contains('hidden') && renderMatchList) {
           renderMatchList();
         }
       });
     }
 
-    item.appendChild(pathRow);
-
-    const mainRow = document.createElement('div');
-    mainRow.className = 'path-item-main';
-
-    const name = document.createElement('strong');
-    name.className = 'path-name';
-    let usedFlavorAsLabel = false;
-    if (Array.isArray(child.matchingPaths) && child.matchingPaths.length > 1) {
-      const label = child.displayName || child.flavorText || '';
-      if (label) {
-        name.textContent = label;
-        usedFlavorAsLabel = !child.displayName && Boolean(child.flavorText);
-      } else if (child.pattern) {
+    const { label, isFlavorLabel, isPatternLabel } = getChildLabelDetails(child);
+    const nameField = getField(item, 'displayName');
+    if (nameField) {
+      if (isPatternLabel) {
+        nameField.textContent = '';
         const code = document.createElement('code');
-        code.textContent = child.pattern;
-        name.appendChild(code);
+        code.textContent = label;
+        nameField.appendChild(code);
+      } else {
+        nameField.textContent = label;
       }
-    } else {
-      name.textContent = child.displayName || '';
     }
 
-    mainRow.appendChild(name);
-
-    item.appendChild(mainRow);
-
-    if (child.flavorText && !usedFlavorAsLabel) {
-      const flavor = document.createElement('div');
-      flavor.className = 'path-flavor';
-      flavor.textContent = child.flavorText;
-      item.appendChild(flavor);
+    const flavorField = setFieldText(item, 'flavorText', child.flavorText || '', {
+      hideWhenEmpty: true
+    });
+    if (flavorField && isFlavorLabel) {
+      flavorField.hidden = true;
     }
 
     listElement.appendChild(item);
@@ -228,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return (
         child.literalPath?.toLowerCase().includes(query) ||
         matchPaths.toLowerCase().includes(query) ||
-        child.displayName?.toLowerCase().includes(query) ||
+        child.name?.toLowerCase().includes(query) ||
         child.flavorText?.toLowerCase().includes(query)
       );
     });
@@ -302,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!match) {
       return '';
     }
-    return match.matchedValue || match.MatchedValue || match.pattern || match.Pattern || match.nodeName || match.NodeName || '';
+    return match.name || match.matchedValue || match.pattern || '';
   };
 
   const renderMatchBadge = () => {
