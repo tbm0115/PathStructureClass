@@ -57,6 +57,11 @@ namespace PathStructure
             config.Imports = config.Imports ?? new List<PathStructureImport>();
             config.Paths = config.Paths ?? new List<PathStructurePath>();
             config.Plugins = config.Plugins ?? new List<PathStructurePlugin>();
+            config.Management = config.Management ?? new PathStructureManagementConfig();
+            config.Management.Authorization = config.Management.Authorization ?? new PathStructureAuthorizationConfig();
+            config.Management.UsageReporting = config.Management.UsageReporting ?? new PathStructureUsageReportingConfig();
+            config.Management.Installation = config.Management.Installation ?? new PathStructureInstallationConfig();
+            config.Models = config.Models ?? new List<PathStructureModel>();
 
             var mergedPaths = new List<PathStructurePath>();
             var mergedPlugins = new List<PathStructurePlugin>();
@@ -120,6 +125,11 @@ namespace PathStructure
             config.Imports = config.Imports ?? new List<PathStructureImport>();
             config.Paths = config.Paths ?? new List<PathStructurePath>();
             config.Plugins = config.Plugins ?? new List<PathStructurePlugin>();
+            config.Management = config.Management ?? new PathStructureManagementConfig();
+            config.Management.Authorization = config.Management.Authorization ?? new PathStructureAuthorizationConfig();
+            config.Management.UsageReporting = config.Management.UsageReporting ?? new PathStructureUsageReportingConfig();
+            config.Management.Installation = config.Management.Installation ?? new PathStructureInstallationConfig();
+            config.Models = config.Models ?? new List<PathStructureModel>();
 
             var mergedPaths = new List<PathStructurePath>();
             var mergedPlugins = new List<PathStructurePlugin>();

@@ -1,0 +1,78 @@
+﻿@page "/admin"
+@using PathStructureServer.Storage
+@inject ServerConfigStore _store
+
+<section class="section">
+    <h2>Management Snapshot</h2>
+    <p><strong>Authorization mode:</strong> @Management?.Authorization?.Mode ?? "none"</p>
+    <p><strong>Usage reporting required:</strong> @(Management?.UsageReporting?.Required == true ? "Yes" : "No")</p>
+    <p><strong>Active model ID:</strong> @(string.IsNullOrWhiteSpace(ActiveModelId) ? "None" : ActiveModelId)</p>
+</section>
+
+<section class="section">
+    <h2>Registered Clients</h2>
+    @if (Clients.Count == 0)
+    {
+        <p class="muted">No clients registered yet.</p>
+    }
+    else
+    {
+        <table>
+            <thead>
+                <tr>
+                    <th>Client ID</th>
+                    <th>Device</th>
+                    <th>User</th>
+                    <th>Principal</th>
+                    <th>Authorized</th>
+                    <th>Last Seen</th>
+                    <th>Install Profile</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var client in Clients)
+                {
+                    <tr>
+                        <td>@client.ClientId</td>
+                        <td>@client.DeviceName</td>
+                        <td>@client.UserName</td>
+                        <td>@client.Principal</td>
+                        <td>@(client.Authorized ? "Yes" : "No")</td>
+                        <td>@(client.LastSeen?.ToString("g") ?? "-")</td>
+                        <td>@client.InstallProfileId</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+<section class="section">
+    <h2>Core Endpoints</h2>
+    <ul>
+        <li><code>GET /api/management/config</code> — view management settings.</li>
+        <li><code>PUT /api/management/config</code> — update management settings.</li>
+        <li><code>POST /api/clients/register</code> — register a managed client.</li>
+        <li><code>POST /api/clients/{clientId}/usage</code> — submit usage telemetry.</li>
+        <li><code>GET /api/clients</code> — list registered clients.</li>
+        <li><code>GET /api/models</code> — list path models.</li>
+        <li><code>POST /api/models</code> — create or update a path model.</li>
+        <li><code>POST /api/models/{modelId}/apply</code> — mark the active path model.</li>
+        <li><code>GET /api/installation/profiles</code> — list installation profiles.</li>
+    </ul>
+</section>
+
+@code {
+
+    public IReadOnlyList<Storage.ClientRecord> Clients { get; private set; } = new List<Storage.ClientRecord>();
+    public PathStructureManagementConfig Management { get; private set; }
+    public string ActiveModelId { get; private set; }
+
+    public void OnGet()
+    {
+        var config = _store.GetConfig();
+        Clients = new List<Storage.ClientRecord>(config.Clients ?? new List<Storage.ClientRecord>());
+        Management = config.Management;
+        ActiveModelId = config.ActiveModelId;
+    }
+}

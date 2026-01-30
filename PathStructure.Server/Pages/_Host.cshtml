@@ -1,0 +1,57 @@
+﻿@page "/"
+@using PathStructureServer
+@model PathStructureServer.Pages._HostModel
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PathStructure Enterprise Admin</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        margin: 2rem;
+        color: #1b1b1b;
+      }
+      header {
+        margin-bottom: 2rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem 0;
+      }
+      .section {
+        border: 1px solid #d9d9d9;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: #fafafa;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.75rem;
+      }
+      th, td {
+        border-bottom: 1px solid #ddd;
+        padding: 0.5rem;
+        text-align: left;
+      }
+      code {
+        background: #f0f0f0;
+        padding: 0.1rem 0.3rem;
+        border-radius: 4px;
+      }
+      .muted {
+        color: #666;
+        font-size: 0.95rem;
+      }
+    </style>
+
+    <component type="typeof(Microsoft.AspNetCore.Components.Web.HeadOutlet)" render-mode="ServerPrerendered" />
+</head>
+<body>
+    <component type="typeof(App)" render-mode="ServerPrerendered" />
+    
+  </body>
+</html>

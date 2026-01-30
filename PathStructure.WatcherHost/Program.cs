@@ -208,7 +208,7 @@ namespace PathStructure.WatcherHost
                         continue;
                     }
 
-                    await HandleClientCommandAsync(line, stream).ConfigureAwait(false);
+                    await HandleClientCommandAsync(line, client, stream).ConfigureAwait(false);
                 }
             }
             catch (Exception)
@@ -376,7 +376,7 @@ namespace PathStructure.WatcherHost
         /// <summary>
         /// Handles a JSON-RPC request from a client.
         /// </summary>
-        private static async Task HandleClientCommandAsync(string payload, NetworkStream stream)
+        private static async Task HandleClientCommandAsync(string payload, TcpClient client, NetworkStream stream)
         {
             try
             {
@@ -878,6 +878,11 @@ namespace PathStructure.WatcherHost
             config.Imports = config.Imports ?? new List<PathStructureImport>();
             config.Paths = config.Paths ?? new List<PathStructurePath>();
             config.Plugins = config.Plugins ?? new List<PathStructurePlugin>();
+            config.Management = config.Management ?? new PathStructureManagementConfig();
+            config.Management.Authorization = config.Management.Authorization ?? new PathStructureAuthorizationConfig();
+            config.Management.UsageReporting = config.Management.UsageReporting ?? new PathStructureUsageReportingConfig();
+            config.Management.Installation = config.Management.Installation ?? new PathStructureInstallationConfig();
+            config.Models = config.Models ?? new List<PathStructureModel>();
             return config;
         }
 
@@ -892,7 +897,9 @@ namespace PathStructure.WatcherHost
             {
                 imports = config.Imports ?? new List<PathStructureImport>(),
                 paths = config.Paths ?? new List<PathStructurePath>(),
-                plugins = config.Plugins ?? new List<PathStructurePlugin>()
+                plugins = config.Plugins ?? new List<PathStructurePlugin>(),
+                management = config.Management ?? new PathStructureManagementConfig(),
+                models = config.Models ?? new List<PathStructureModel>()
             };
 
             lock (ConfigSync)
@@ -1051,6 +1058,13 @@ namespace PathStructure.WatcherHost
 
         private static PathStructureConfig BuildDefaultConfig()
         {
+            var defaultProfile = new PathStructureInstallationProfile
+            {
+                Id = "default",
+                Name = "Default",
+                Description = "Default managed installation profile."
+            };
+
             var documents = new PathStructurePath
             {
                 Regex = @"^Documents$",
@@ -1132,7 +1146,22 @@ namespace PathStructure.WatcherHost
             {
                 Imports = new List<PathStructureImport>(),
                 Paths = new List<PathStructurePath> { drive },
-                Plugins = new List<PathStructurePlugin>()
+                Plugins = new List<PathStructurePlugin>(),
+                Management = new PathStructureManagementConfig
+                {
+                    Authorization = new PathStructureAuthorizationConfig(),
+                    UsageReporting = new PathStructureUsageReportingConfig
+                    {
+                        Required = false,
+                        MinimumReportIntervalSeconds = 60
+                    },
+                    Installation = new PathStructureInstallationConfig
+                    {
+                        DefaultProfileId = defaultProfile.Id,
+                        Profiles = new List<PathStructureInstallationProfile> { defaultProfile }
+                    }
+                },
+                Models = new List<PathStructureModel>()
             };
         }
 

@@ -64,6 +64,7 @@ watcher.StartWatcher();
 - `PathStructure.Abstracts` defines plugin contracts and discovery helpers.
 - `ExamplePlugins` includes sample plugin implementations for validation.
 - `PathStructureClient` contains the Electron-based client shell.
+- `PathStructure.Server` hosts the enterprise management service for centralized administration.
 
 ## Notes
 
