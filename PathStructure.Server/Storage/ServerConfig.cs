@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace PathStructure.Server.Storage
 {
-    internal sealed class ServerConfig
+    public sealed class ServerConfig
     {
         public PathStructureManagementConfig Management { get; set; } = new PathStructureManagementConfig();
         public IList<PathStructureModel> Models { get; set; } = new List<PathStructureModel>();
@@ -12,7 +12,7 @@ namespace PathStructure.Server.Storage
         public DateTimeOffset? UpdatedAt { get; set; }
     }
 
-    internal sealed class ClientRecord
+    public sealed class ClientRecord
     {
         public string ClientId { get; set; }
         public string DeviceName { get; set; }
@@ -26,7 +26,7 @@ namespace PathStructure.Server.Storage
         public UsageReportRecord LastUsageReport { get; set; }
     }
 
-    internal sealed class UsageReportRecord
+    public sealed class UsageReportRecord
     {
         public string ClientId { get; set; }
         public string Path { get; set; }

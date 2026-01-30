@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace PathStructure.Server.Storage
 {
-    internal sealed class ServerConfigStore
+    public sealed class ServerConfigStore
     {
         private const string DefaultConfigFileName = "pathstructure-enterprise.json";
         private readonly object _syncRoot = new object();
