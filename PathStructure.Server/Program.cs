@@ -9,15 +9,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<ServerConfigStore>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddControllers();
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AddPageRoute("/Admin/Index", "/admin");
+    options.Conventions.AddPageRoute("/Admin/Index", "/admin/");
+});
 
 var app = builder.Build();
 
-app.UseDefaultFiles(new DefaultFilesOptions
-{
-    RequestPath = "/admin"
-});
 app.UseStaticFiles();
 app.MapGet("/", () => Results.Redirect("/admin/"));
 app.MapControllers();
+app.MapRazorPages();
 
 app.Run();

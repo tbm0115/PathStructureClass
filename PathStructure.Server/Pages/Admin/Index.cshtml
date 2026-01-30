@@ -1,0 +1,120 @@
+@page
+@model PathStructure.Server.Pages.Admin.IndexModel
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PathStructure Enterprise Admin</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        margin: 2rem;
+        color: #1b1b1b;
+      }
+      header {
+        margin-bottom: 2rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem 0;
+      }
+      .section {
+        border: 1px solid #d9d9d9;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        background: #fafafa;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.75rem;
+      }
+      th, td {
+        border-bottom: 1px solid #ddd;
+        padding: 0.5rem;
+        text-align: left;
+      }
+      code {
+        background: #f0f0f0;
+        padding: 0.1rem 0.3rem;
+        border-radius: 4px;
+      }
+      .muted {
+        color: #666;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>PathStructure Enterprise Admin</h1>
+      <p class="muted">
+        Central admin view for managed client installs. Use the REST endpoints below or extend these pages.
+      </p>
+    </header>
+
+    <section class="section">
+      <h2>Management Snapshot</h2>
+      <p><strong>Authorization mode:</strong> @Model.Management?.Authorization?.Mode ?? "none"</p>
+      <p><strong>Usage reporting required:</strong> @(Model.Management?.UsageReporting?.Required == true ? "Yes" : "No")</p>
+      <p><strong>Active model ID:</strong> @(string.IsNullOrWhiteSpace(Model.ActiveModelId) ? "None" : Model.ActiveModelId)</p>
+    </section>
+
+    <section class="section">
+      <h2>Registered Clients</h2>
+      @if (Model.Clients.Count == 0)
+      {
+          <p class="muted">No clients registered yet.</p>
+      }
+      else
+      {
+          <table>
+            <thead>
+              <tr>
+                <th>Client ID</th>
+                <th>Device</th>
+                <th>User</th>
+                <th>Principal</th>
+                <th>Authorized</th>
+                <th>Last Seen</th>
+                <th>Install Profile</th>
+              </tr>
+            </thead>
+            <tbody>
+            @foreach (var client in Model.Clients)
+            {
+              <tr>
+                <td>@client.ClientId</td>
+                <td>@client.DeviceName</td>
+                <td>@client.UserName</td>
+                <td>@client.Principal</td>
+                <td>@(client.Authorized ? "Yes" : "No")</td>
+                <td>@(client.LastSeen?.ToString("g") ?? "-")</td>
+                <td>@client.InstallProfileId</td>
+              </tr>
+            }
+            </tbody>
+          </table>
+      }
+    </section>
+
+    <section class="section">
+      <h2>Core Endpoints</h2>
+      <ul>
+        <li><code>GET /api/management/config</code> — view management settings.</li>
+        <li><code>PUT /api/management/config</code> — update management settings.</li>
+        <li><code>POST /api/clients/register</code> — register a managed client.</li>
+        <li><code>POST /api/clients/{clientId}/usage</code> — submit usage telemetry.</li>
+        <li><code>GET /api/clients</code> — list registered clients.</li>
+        <li><code>GET /api/models</code> — list path models.</li>
+        <li><code>POST /api/models</code> — create or update a path model.</li>
+        <li><code>POST /api/models/{modelId}/apply</code> — mark the active path model.</li>
+        <li><code>GET /api/installation/profiles</code> — list installation profiles.</li>
+      </ul>
+    </section>
+  </body>
+</html>
