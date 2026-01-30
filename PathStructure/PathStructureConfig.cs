@@ -43,6 +43,16 @@ namespace PathStructure
 
         IReadOnlyList<IPathStructurePlugin> IPathStructureConfig.Plugins => Plugins.Cast<IPathStructurePlugin>().ToList();
 
+        /// <summary>
+        /// Gets the optional server-side management configuration.
+        /// </summary>
+        public PathStructureManagementConfig Management { get; set; } = new PathStructureManagementConfig();
+
+        /// <summary>
+        /// Gets the reusable path structure models.
+        /// </summary>
+        public IList<PathStructureModel> Models { get; set; } = new List<PathStructureModel>();
+
         /// <inheritdoc />
         public IPathNode Root { get; private set; }
 

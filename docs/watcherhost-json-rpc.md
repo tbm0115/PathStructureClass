@@ -36,6 +36,7 @@ Emitted when a client connects.
 {"jsonrpc":"2.0","method":"status","params":{"message":"Client connected.","state":"connected","timestamp":"2024-01-01T00:00:00.0000000+00:00"}}
 ```
 
+
 ## Requests (client → server)
 
 ### `addPath`
@@ -78,6 +79,7 @@ Registers an import configuration file. If `filePath` is provided, the watcher h
 {"jsonrpc":"2.0","id":"2","result":{"message":"Import added.","importPath":"C:\\\\Users\\\\User\\\\AppData\\\\Local\\\\PathStructure\\\\AdditionalPaths.json"}}
 ```
 
+
 ## Error codes
 
 | Code | Meaning |
@@ -93,3 +95,4 @@ Registers an import configuration file. If `filePath` is provided, the watcher h
 | -32005 | Unable to save config file |
 | -32006 | Import file not found |
 | -32007 | Unable to copy import file |
+| -32008 | Import not found |

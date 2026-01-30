@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>PathStructure.Server</RootNamespace>
+    <AssemblyName>PathStructure.Server</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\\PathStructure.Abstracts\\PathStructure.Abstracts.csproj" />
+    <ProjectReference Include="..\\PathStructure\\PathStructure.csproj" />
+  </ItemGroup>
+</Project>

@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExamplePlugins", "ExamplePl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PathStructure.WatcherHost", "PathStructure.WatcherHost\\PathStructure.WatcherHost.csproj", "{4FBF4C3D-0F11-4E07-9AEF-2BA6AA9C54C7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PathStructure.Server", "PathStructure.Server\\PathStructure.Server.csproj", "{1BE4267F-F277-4027-B3C2-5E4E9FFD19E3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{4FBF4C3D-0F11-4E07-9AEF-2BA6AA9C54C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4FBF4C3D-0F11-4E07-9AEF-2BA6AA9C54C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4FBF4C3D-0F11-4E07-9AEF-2BA6AA9C54C7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1BE4267F-F277-4027-B3C2-5E4E9FFD19E3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1BE4267F-F277-4027-B3C2-5E4E9FFD19E3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1BE4267F-F277-4027-B3C2-5E4E9FFD19E3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1BE4267F-F277-4027-B3C2-5E4E9FFD19E3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
