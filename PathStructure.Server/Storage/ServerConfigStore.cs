@@ -1,10 +1,11 @@
+using PathStructure;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
 
-namespace PathStructure.Server.Storage
+namespace PathStructureServer.Storage
 {
     public sealed class ServerConfigStore
     {

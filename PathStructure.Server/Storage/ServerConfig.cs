@@ -1,7 +1,8 @@
+using PathStructure;
 using System;
 using System.Collections.Generic;
 
-namespace PathStructure.Server.Storage
+namespace PathStructureServer.Storage
 {
     public sealed class ServerConfig
     {

@@ -2,9 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
-using PathStructure.Server.Storage;
+using PathStructure;
+using PathStructureServer.Storage;
 
-namespace PathStructure.Server.Controllers
+namespace PathStructureServer.Controllers
 {
     [ApiController]
     [Route("api/models")]

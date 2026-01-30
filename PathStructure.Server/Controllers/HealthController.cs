@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace PathStructure.Server.Controllers
+namespace PathStructureServer.Controllers
 {
     [ApiController]
     [Route("api/health")]

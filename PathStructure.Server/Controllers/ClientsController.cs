@@ -1,8 +1,8 @@
 using System;
 using Microsoft.AspNetCore.Mvc;
-using PathStructure.Server.Storage;
+using PathStructureServer.Storage;
 
-namespace PathStructure.Server.Controllers
+namespace PathStructureServer.Controllers
 {
     [ApiController]
     [Route("api/clients")]
