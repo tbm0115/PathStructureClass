@@ -226,17 +226,18 @@ namespace PathStructure.WatcherHost
         private static void OnExplorerFound(string url)
         {
             _lastSelectionPath = url;
-            var matchSummary = FindClosestMatches(url);
+            var monitoredPath = GetParentPath(url) ?? url;
+            var matchSummary = FindClosestMatches(monitoredPath);
             IReadOnlyList<PathPatternMatch> matches = Array.Empty<PathPatternMatch>();
-            var hasMatches = TryGetMatchTrail(url, out matches, out var variables);
-            if (!hasMatches && IsFilePath(url))
+            var hasMatches = TryGetMatchTrail(monitoredPath, out matches, out var variables);
+            if (!hasMatches && IsFilePath(monitoredPath))
             {
-                hasMatches = TryGetMatchTrail(Path.GetDirectoryName(url), out matches, out variables);
+                hasMatches = TryGetMatchTrail(Path.GetDirectoryName(monitoredPath), out matches, out variables);
             }
             var currentMatch = hasMatches ? matches[0] : default;
             var childMatches = hasMatches
                 ? FindImmediateChildMatches(new[] { currentMatch })
-                : FindImmediateChildMatches(url, matchSummary);
+                : FindImmediateChildMatches(monitoredPath, matchSummary);
             var matchesPayload = hasMatches
                 ? matches.Select(match =>
                 {
@@ -256,7 +257,7 @@ namespace PathStructure.WatcherHost
                 Params = new PathChangedNotificationParams
                 {
                     Message = "Explorer path changed.",
-                    Path = url,
+                    Path = monitoredPath,
                     CurrentMatch = hasMatches ? BuildPathMatchDto(currentMatch) : null,
                     Variables = variables,
                     Matches = matchesPayload,

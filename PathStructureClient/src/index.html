@@ -9,6 +9,10 @@
   <body>
     <main>
       <section class="tracked-panel">
+        <div id="tracked-folder-group">
+          <p class="label">Tracked folder</p>
+          <p id="tracked-folder" class="value">Awaiting Explorer selection.</p>
+        </div>
         <div>
           <p id="tracked-path" class="value">No path selected.</p>
           <p class="value"><strong id="tracked-name"></strong></p>
@@ -18,16 +22,12 @@
           </div>
           <p id="tracked-flavor" class="path-flavor muted" hidden></p>
         </div>
-        <div id="tracked-folder-group">
-          <p class="label">Tracked folder</p>
-          <p id="tracked-folder" class="value">Awaiting Explorer selection.</p>
-        </div>
       </section>
 
       <section class="child-panel" id="child-panel">
         <div class="child-panel-header">
           <div>
-            <h2>Child structures</h2>
+            <h2>Tracked Files/Folders</h2>
             <p class="subtitle">Items expected directly beneath the tracked folder.</p>
           </div>
           <span id="child-count" class="count-pill">0 items</span>
