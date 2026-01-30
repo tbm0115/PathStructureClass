@@ -8,8 +8,11 @@ namespace PathStructureServer.Storage
     {
         public PathStructureManagementConfig Management { get; set; } = new PathStructureManagementConfig();
         public IList<PathStructureModel> Models { get; set; } = new List<PathStructureModel>();
+        public IList<StandardPathStructureVersion> StandardPathStructures { get; set; } = new List<StandardPathStructureVersion>();
         public IList<ClientRecord> Clients { get; set; } = new List<ClientRecord>();
         public string ActiveModelId { get; set; }
+        public string ReleasedStandardPathStructureId { get; set; }
+        public DateTimeOffset? ReleasedStandardPathStructureAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
     }
 
@@ -36,5 +39,16 @@ namespace PathStructureServer.Storage
         public string StartedAt { get; set; }
         public string EndedAt { get; set; }
         public DateTimeOffset? ReportedAt { get; set; }
+    }
+
+    public sealed class StandardPathStructureVersion
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Version { get; set; }
+        public string Description { get; set; }
+        public string FileName { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset? UpdatedAt { get; set; }
     }
 }

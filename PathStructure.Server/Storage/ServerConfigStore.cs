@@ -50,6 +50,7 @@ namespace PathStructureServer.Storage
                 var config = JsonSerializer.Deserialize<ServerConfig>(json, _serializerOptions) ?? BuildDefaultConfig();
                 config.Management = NormalizeManagement(config.Management);
                 config.Models = config.Models ?? new List<PathStructureModel>();
+                config.StandardPathStructures = config.StandardPathStructures ?? new List<StandardPathStructureVersion>();
                 config.Clients = config.Clients ?? new List<ClientRecord>();
                 _cachedConfig = config;
                 return _cachedConfig;
@@ -67,6 +68,7 @@ namespace PathStructureServer.Storage
             {
                 config.Management = NormalizeManagement(config.Management);
                 config.Models = config.Models ?? new List<PathStructureModel>();
+                config.StandardPathStructures = config.StandardPathStructures ?? new List<StandardPathStructureVersion>();
                 config.Clients = config.Clients ?? new List<ClientRecord>();
                 config.UpdatedAt = Now();
                 var path = EnsureConfigPath();
@@ -206,8 +208,11 @@ namespace PathStructureServer.Storage
                     }
                 },
                 Models = new List<PathStructureModel>(),
+                StandardPathStructures = new List<StandardPathStructureVersion>(),
                 Clients = new List<ClientRecord>(),
                 ActiveModelId = null,
+                ReleasedStandardPathStructureId = null,
+                ReleasedStandardPathStructureAt = null,
                 UpdatedAt = Now()
             };
         }

@@ -7,6 +7,7 @@ using PathStructureServer.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<ServerConfigStore>();
+builder.Services.AddSingleton<StandardPathStructureStore>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();

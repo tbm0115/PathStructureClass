@@ -1,16 +1,106 @@
 ﻿@page "/admin"
+@using System
+@using System.Linq
+@using System.Collections.Generic
 @using PathStructureServer.Storage
+@using PathStructure
 @inject ServerConfigStore _store
+@inject StandardPathStructureStore _standardStore
 
 <section class="section">
     <h2>Management Snapshot</h2>
-    <p><strong>Authorization mode:</strong> @Management?.Authorization?.Mode ?? "none"</p>
-    <p><strong>Usage reporting required:</strong> @(Management?.UsageReporting?.Required == true ? "Yes" : "No")</p>
-    <p><strong>Active model ID:</strong> @(string.IsNullOrWhiteSpace(ActiveModelId) ? "None" : ActiveModelId)</p>
+    <div class="grid">
+        <div>
+            <p><strong>Authorization mode:</strong> @Management?.Authorization?.Mode ?? "none"</p>
+            <p><strong>Usage reporting required:</strong> @(Management?.UsageReporting?.Required == true ? "Yes" : "No")</p>
+            <p><strong>Active model ID:</strong> @(string.IsNullOrWhiteSpace(ActiveModelId) ? "None" : ActiveModelId)</p>
+        </div>
+        <div>
+            <p><strong>Released path structure:</strong> @(string.IsNullOrWhiteSpace(ReleasedStandardId) ? "None" : ReleasedStandardName)</p>
+            <p><strong>Released at:</strong> @(ReleasedStandardAt?.ToString("g") ?? "-")</p>
+            <p><strong>Config updated:</strong> @(LastConfigUpdate?.ToString("g") ?? "-")</p>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <h2>Standard Path Structures</h2>
+    <p class="muted">
+        Maintain versioned JSON configurations for your standard paths. Drafts stay private until you release them to managed clients.
+    </p>
+    @if (!string.IsNullOrWhiteSpace(StatusMessage))
+    {
+        <div class="alert @(StatusIsError ? "alert-error" : "alert-success")">@StatusMessage</div>
+    }
+    <div class="grid">
+        <div>
+            <h3>Versions</h3>
+            @if (StandardVersions.Count == 0)
+            {
+                <p class="muted">No path structure versions stored yet.</p>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Version</th>
+                            <th>Description</th>
+                            <th>Updated</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var version in StandardVersions)
+                        {
+                            var isReleased = string.Equals(version.Id, ReleasedStandardId, StringComparison.OrdinalIgnoreCase);
+                            <tr class="@(isReleased ? "highlight" : string.Empty)">
+                                <td>@version.Name</td>
+                                <td>@version.Version</td>
+                                <td>@version.Description</td>
+                                <td>@(version.UpdatedAt?.ToString("g") ?? version.CreatedAt.ToString("g"))</td>
+                                <td>@(isReleased ? "Released" : "Draft")</td>
+                                <td class="actions">
+                                    <button class="secondary" @onclick="() => EditVersion(version)">Edit</button>
+                                    <button class="primary" @onclick="() => ReleaseVersion(version)" disabled="@isReleased">Release</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+        <div>
+            <h3>@(IsEditingExisting ? "Edit Version" : "Create New Version")</h3>
+            <div class="form-field">
+                <label>Name</label>
+                <input type="text" @bind="Editor.Name" />
+            </div>
+            <div class="form-field">
+                <label>Version Label</label>
+                <input type="text" @bind="Editor.Version" placeholder="e.g. v1.2" />
+            </div>
+            <div class="form-field">
+                <label>Description</label>
+                <textarea rows="2" @bind="Editor.Description"></textarea>
+            </div>
+            <div class="form-field">
+                <label>Configuration JSON</label>
+                <textarea rows="12" class="monospace" @bind="Editor.Json"></textarea>
+            </div>
+            <div class="actions">
+                <button class="primary" @onclick="SaveVersion">Save Version</button>
+                <button class="secondary" @onclick="StartNewVersion">New Draft</button>
+            </div>
+        </div>
+    </div>
 </section>
 
 <section class="section">
     <h2>Registered Clients</h2>
+    <p class="muted">Approve access, assign installation profiles, and monitor client telemetry.</p>
     @if (Clients.Count == 0)
     {
         <p class="muted">No clients registered yet.</p>
@@ -27,6 +117,8 @@
                     <th>Authorized</th>
                     <th>Last Seen</th>
                     <th>Install Profile</th>
+                    <th>Usage</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
@@ -39,7 +131,34 @@
                         <td>@client.Principal</td>
                         <td>@(client.Authorized ? "Yes" : "No")</td>
                         <td>@(client.LastSeen?.ToString("g") ?? "-")</td>
-                        <td>@client.InstallProfileId</td>
+                        <td>
+                            <select @onchange="eventArgs => UpdateClientProfile(client, eventArgs.Value?.ToString())">
+                                <option value="">Default</option>
+                                @foreach (var profile in InstallationProfiles)
+                                {
+                                    <option value="@profile.Id" selected="@(string.Equals(profile.Id, client.InstallProfileId, StringComparison.OrdinalIgnoreCase))">@profile.Name</option>
+                                }
+                            </select>
+                        </td>
+                        <td>
+                            @if (client.LastUsageReport == null)
+                            {
+                                <span class="muted">No reports</span>
+                            }
+                            else
+                            {
+                                <div>
+                                    <div>@client.LastUsageReport.Path</div>
+                                    <small class="muted">@client.LastUsageReport.SelectionKind (@(client.LastUsageReport.DurationSeconds ?? 0))s</small>
+                                </div>
+                            }
+                        </td>
+                        <td class="actions">
+                            <button class="secondary" @onclick="() => ToggleClientAuthorization(client)">
+                                @(client.Authorized ? "Revoke" : "Authorize")
+                            </button>
+                            <button class="danger" @onclick="() => RemoveClient(client)">Remove</button>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -59,20 +178,219 @@
         <li><code>POST /api/models</code> — create or update a path model.</li>
         <li><code>POST /api/models/{modelId}/apply</code> — mark the active path model.</li>
         <li><code>GET /api/installation/profiles</code> — list installation profiles.</li>
+        <li><code>GET /api/standard-path-structures</code> — list standard path structure versions.</li>
+        <li><code>GET /api/standard-path-structures/released</code> — fetch the released path structure.</li>
     </ul>
 </section>
 
 @code {
 
     public IReadOnlyList<Storage.ClientRecord> Clients { get; private set; } = new List<Storage.ClientRecord>();
+    public IReadOnlyList<StandardPathStructureVersion> StandardVersions { get; private set; } = new List<StandardPathStructureVersion>();
+    public IReadOnlyList<PathStructureInstallationProfile> InstallationProfiles { get; private set; } = new List<PathStructureInstallationProfile>();
     public PathStructureManagementConfig Management { get; private set; }
     public string ActiveModelId { get; private set; }
+    public string ReleasedStandardId { get; private set; }
+    public string ReleasedStandardName { get; private set; }
+    public DateTimeOffset? ReleasedStandardAt { get; private set; }
+    public DateTimeOffset? LastConfigUpdate { get; private set; }
+    public StandardPathStructureEditor Editor { get; set; } = new StandardPathStructureEditor();
+    public string StatusMessage { get; private set; }
+    public bool StatusIsError { get; private set; }
+    public bool IsEditingExisting { get; private set; }
 
-    public void OnGet()
+    protected override void OnInitialized()
+    {
+        LoadData();
+        StartNewVersion();
+    }
+
+    private void LoadData()
     {
         var config = _store.GetConfig();
         Clients = new List<Storage.ClientRecord>(config.Clients ?? new List<Storage.ClientRecord>());
         Management = config.Management;
         ActiveModelId = config.ActiveModelId;
+        StandardVersions = new List<StandardPathStructureVersion>(config.StandardPathStructures ?? new List<StandardPathStructureVersion>());
+        InstallationProfiles = new List<PathStructureInstallationProfile>(config.Management?.Installation?.Profiles ?? new List<PathStructureInstallationProfile>());
+        ReleasedStandardId = config.ReleasedStandardPathStructureId;
+        ReleasedStandardAt = config.ReleasedStandardPathStructureAt;
+        ReleasedStandardName = StandardVersions.FirstOrDefault(version =>
+            string.Equals(version.Id, ReleasedStandardId, StringComparison.OrdinalIgnoreCase))?.Name;
+        LastConfigUpdate = config.UpdatedAt;
+    }
+
+    private void StartNewVersion()
+    {
+        IsEditingExisting = false;
+        Editor = new StandardPathStructureEditor
+        {
+            Json = DefaultJson()
+        };
+        StatusMessage = null;
+        StatusIsError = false;
+    }
+
+    private void EditVersion(StandardPathStructureVersion version)
+    {
+        if (version == null)
+        {
+            return;
+        }
+
+        IsEditingExisting = true;
+        Editor = new StandardPathStructureEditor
+        {
+            Id = version.Id,
+            Name = version.Name,
+            Version = version.Version,
+            Description = version.Description,
+            Json = _standardStore.ReadRawJson(version) ?? DefaultJson()
+        };
+        StatusMessage = null;
+        StatusIsError = false;
+    }
+
+    private void SaveVersion()
+    {
+        StatusMessage = null;
+        StatusIsError = false;
+
+        if (!_standardStore.TryParseConfig(Editor.Json, out var parsedConfig, out var error))
+        {
+            StatusMessage = error;
+            StatusIsError = true;
+            return;
+        }
+
+        var config = _store.GetConfig();
+        var name = _store.NormalizeString(Editor.Name);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            StatusMessage = "A name is required for the standard path structure.";
+            StatusIsError = true;
+            return;
+        }
+
+        var existing = config.StandardPathStructures.FirstOrDefault(entry =>
+            string.Equals(entry.Id, Editor.Id, StringComparison.OrdinalIgnoreCase));
+        if (existing == null)
+        {
+            existing = new StandardPathStructureVersion
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                CreatedAt = _standardStore.Now()
+            };
+            config.StandardPathStructures.Add(existing);
+        }
+
+        existing.Name = name;
+        existing.Version = _store.NormalizeString(Editor.Version);
+        existing.Description = _store.NormalizeString(Editor.Description);
+        existing.UpdatedAt = _standardStore.Now();
+
+        _standardStore.SaveConfig(existing, parsedConfig, Editor.Json);
+        _store.SaveConfig(config);
+
+        StatusMessage = "Standard path structure saved.";
+        StatusIsError = false;
+        LoadData();
+        EditVersion(existing);
+    }
+
+    private void ReleaseVersion(StandardPathStructureVersion version)
+    {
+        if (version == null)
+        {
+            return;
+        }
+
+        var config = _store.GetConfig();
+        config.ReleasedStandardPathStructureId = version.Id;
+        config.ReleasedStandardPathStructureAt = _store.Now();
+        _store.SaveConfig(config);
+
+        StatusMessage = $"Released {version.Name} to connected clients.";
+        StatusIsError = false;
+        LoadData();
+    }
+
+    private void ToggleClientAuthorization(ClientRecord client)
+    {
+        if (client == null)
+        {
+            return;
+        }
+
+        var config = _store.GetConfig();
+        var record = config.Clients.FirstOrDefault(entry =>
+            string.Equals(entry.ClientId, client.ClientId, StringComparison.OrdinalIgnoreCase));
+        if (record == null)
+        {
+            return;
+        }
+
+        record.Authorized = !record.Authorized;
+        record.LastSeen = _store.Now();
+        _store.SaveConfig(config);
+        LoadData();
+    }
+
+    private void UpdateClientProfile(ClientRecord client, string profileId)
+    {
+        if (client == null)
+        {
+            return;
+        }
+
+        var config = _store.GetConfig();
+        var record = config.Clients.FirstOrDefault(entry =>
+            string.Equals(entry.ClientId, client.ClientId, StringComparison.OrdinalIgnoreCase));
+        if (record == null)
+        {
+            return;
+        }
+
+        record.InstallProfileId = _store.ResolveProfileId(profileId, config.Management?.Installation);
+        _store.SaveConfig(config);
+        LoadData();
+    }
+
+    private void RemoveClient(ClientRecord client)
+    {
+        if (client == null)
+        {
+            return;
+        }
+
+        var config = _store.GetConfig();
+        var existing = config.Clients.FirstOrDefault(entry =>
+            string.Equals(entry.ClientId, client.ClientId, StringComparison.OrdinalIgnoreCase));
+        if (existing == null)
+        {
+            return;
+        }
+
+        config.Clients.Remove(existing);
+        _store.SaveConfig(config);
+        LoadData();
+    }
+
+    private string DefaultJson()
+    {
+        var config = new PathStructureConfig();
+        return System.Text.Json.JsonSerializer.Serialize(config, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+    }
+
+    public sealed class StandardPathStructureEditor
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Version { get; set; }
+        public string Description { get; set; }
+        public string Json { get; set; }
     }
 }
