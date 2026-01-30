@@ -12,13 +12,13 @@ builder.Services.AddControllers();
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AddPageRoute("/Admin/Index", "/admin");
-    options.Conventions.AddPageRoute("/Admin/Index", "/admin/");
 });
 
 var app = builder.Build();
 
 app.UseStaticFiles();
 app.MapGet("/", () => Results.Redirect("/admin/"));
+app.MapGet("/admin/", () => Results.Redirect("/admin"));
 app.MapControllers();
 app.MapRazorPages();
 
